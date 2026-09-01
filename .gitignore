@@ -1,0 +1,11 @@
+# Binarios compilados
+cpp/pita
+*.o
+*.exe
+
+# Python
+__pycache__/
+*.pyc
+
+# Sistema
+.DS_Store

@@ -1,0 +1,3 @@
+FIS|Facultad de Ingenierias y Tecnologicas|Por definir|1
+FCA|Facultad de Ciencias Administrativas Contables y Economicas|Por definir|1
+FCS|Facultad de Ciencias de la Salud|Por definir|1
