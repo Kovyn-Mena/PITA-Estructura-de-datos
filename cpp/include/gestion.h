@@ -14,7 +14,7 @@ void desactivarFacultad(std::vector<Facultad>& facultades, const std::string& co
 void eliminarFacultad(std::vector<Facultad>& facultades, const std::string& codigo);
 
 // ===================== PROGRAMAS =====================
-void crearPrograma(std::vector<Programa>& programas);
+void crearPrograma(std::vector<Programa>& programas, std::vector<Facultad>& facultades);
 void listarProgramas(const std::vector<Programa>& programas);
 Programa* buscarPrograma(std::vector<Programa>& programas, const std::string& codigo);
 void modificarPrograma(std::vector<Programa>& programas, const std::string& codigo);
@@ -22,7 +22,7 @@ void desactivarPrograma(std::vector<Programa>& programas, const std::string& cod
 void eliminarPrograma(std::vector<Programa>& programas, const std::string& codigo);
 
 // ===================== CURSOS =====================
-void crearCurso(std::vector<Curso>& cursos);
+void crearCurso(std::vector<Curso>& cursos, std::vector<Programa>& programas);
 void listarCursos(const std::vector<Curso>& cursos);
 Curso* buscarCurso(std::vector<Curso>& cursos, const std::string& codigo);
 void modificarCurso(std::vector<Curso>& cursos, const std::string& codigo);
