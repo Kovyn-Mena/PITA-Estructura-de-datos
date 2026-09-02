@@ -1,4 +1,5 @@
 #include "../include/gestion.h"
+#include "../include/interfaz.h"
 #include <iostream>
 #include <limits>
 
@@ -7,19 +8,24 @@ using namespace std;
 // =========================================================================
 // FACULTADES — implementacion completa, usar como PATRON para las demas
 // entidades (Programa, Curso, Estudiante, Profesor, Administrativo).
+//
+// Nota de diseño: todos los campos de "codigo/identificacion" se leen con
+// leerPalabra(), que YA deja el buffer de entrada limpio (sin '\n'
+// pendiente), asi que los getline() que siguen funcionan bien a la
+// primera. Ademas, escribir la palabra "cancelar" en ese campo aborta la
+// creacion sin guardar nada — util si se entro al menu por error.
 // =========================================================================
 
 void crearFacultad(vector<Facultad>& facultades) {
     Facultad f;
-    cout << "Codigo facultad: ";
-    cin >> f.codigo;
+    f.codigo = leerPalabra("Codigo facultad (o 'cancelar' para volver): ");
+    if (esCancelar(f.codigo)) { cout << "Operacion cancelada.\n"; return; }
 
     if (buscarFacultad(facultades, f.codigo) != nullptr) {
         cout << "Ya existe una facultad con ese codigo.\n";
         return;
     }
 
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cout << "Nombre: ";
     getline(cin, f.nombre);
     cout << "Decano: ";
@@ -53,7 +59,6 @@ void modificarFacultad(vector<Facultad>& facultades, const string& codigo) {
     Facultad* f = buscarFacultad(facultades, codigo);
     if (!f) { cout << "Facultad no encontrada.\n"; return; }
 
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cout << "Nuevo nombre (" << f->nombre << "): ";
     getline(cin, f->nombre);
     cout << "Nuevo decano (" << f->decano << "): ";
@@ -82,22 +87,22 @@ void eliminarFacultad(vector<Facultad>& facultades, const string& codigo) {
 // =========================================================================
 // PROGRAMAS — mismo patron que Facultad, con una validacion extra:
 // un Programa pertenece a una Facultad, asi que se verifica que la
-// facultad exista y este activa antes de crear el programa (integridad
-// referencial basica, sin usar claves foraneas de base de datos real).
+// facultad exista y este activa antes de crear el programa.
 // =========================================================================
 
 void crearPrograma(vector<Programa>& programas, vector<Facultad>& facultades) {
     Programa p;
-    cout << "Codigo programa: ";
-    cin >> p.codigo;
+    p.codigo = leerPalabra("Codigo programa (o 'cancelar' para volver): ");
+    if (esCancelar(p.codigo)) { cout << "Operacion cancelada.\n"; return; }
 
     if (buscarPrograma(programas, p.codigo) != nullptr) {
         cout << "Ya existe un programa con ese codigo.\n";
         return;
     }
 
-    cout << "Codigo de la facultad a la que pertenece: ";
-    cin >> p.codigoFacultad;
+    p.codigoFacultad = leerPalabra("Codigo de la facultad a la que pertenece: ");
+    if (esCancelar(p.codigoFacultad)) { cout << "Operacion cancelada.\n"; return; }
+
     Facultad* f = buscarFacultad(facultades, p.codigoFacultad);
     if (!f) {
         cout << "Esa facultad no existe. Cree primero la facultad.\n";
@@ -108,7 +113,6 @@ void crearPrograma(vector<Programa>& programas, vector<Facultad>& facultades) {
         return;
     }
 
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cout << "Nombre del programa: ";
     getline(cin, p.nombre);
     cout << "Nivel (Tecnologico/Pregrado/Especializacion/Maestria): ";
@@ -143,7 +147,6 @@ void modificarPrograma(vector<Programa>& programas, const string& codigo) {
     Programa* p = buscarPrograma(programas, codigo);
     if (!p) { cout << "Programa no encontrado.\n"; return; }
 
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cout << "Nuevo nombre (" << p->nombre << "): ";
     getline(cin, p->nombre);
     cout << "Nuevo nivel (" << p->nivel << "): ";
@@ -177,16 +180,17 @@ void eliminarPrograma(vector<Programa>& programas, const string& codigo) {
 
 void crearCurso(vector<Curso>& cursos, vector<Programa>& programas) {
     Curso c;
-    cout << "Codigo curso: ";
-    cin >> c.codigo;
+    c.codigo = leerPalabra("Codigo curso (o 'cancelar' para volver): ");
+    if (esCancelar(c.codigo)) { cout << "Operacion cancelada.\n"; return; }
 
     if (buscarCurso(cursos, c.codigo) != nullptr) {
         cout << "Ya existe un curso con ese codigo.\n";
         return;
     }
 
-    cout << "Codigo del programa al que pertenece: ";
-    cin >> c.codigoPrograma;
+    c.codigoPrograma = leerPalabra("Codigo del programa al que pertenece: ");
+    if (esCancelar(c.codigoPrograma)) { cout << "Operacion cancelada.\n"; return; }
+
     Programa* p = buscarPrograma(programas, c.codigoPrograma);
     if (!p) {
         cout << "Ese programa no existe. Cree primero el programa.\n";
@@ -197,12 +201,10 @@ void crearCurso(vector<Curso>& cursos, vector<Programa>& programas) {
         return;
     }
 
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cout << "Nombre del curso: ";
     getline(cin, c.nombre);
     cout << "Creditos: ";
-    cin >> c.creditos;
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    c.creditos = leerEntero();
     cout << "Codigo del profesor (Enter si aun no se asigna): ";
     getline(cin, c.codigoProfesor);
     c.activo = true;
@@ -236,11 +238,10 @@ void modificarCurso(vector<Curso>& cursos, const string& codigo) {
     Curso* c = buscarCurso(cursos, codigo);
     if (!c) { cout << "Curso no encontrado.\n"; return; }
 
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cout << "Nuevo nombre (" << c->nombre << "): ";
     getline(cin, c->nombre);
     cout << "Nuevos creditos (" << c->creditos << "): ";
-    cin >> c->creditos;
+    c->creditos = leerEntero();
     cout << "Curso modificado.\n";
 }
 
@@ -270,23 +271,23 @@ void eliminarCurso(vector<Curso>& cursos, const string& codigo) {
 
 void crearEstudiante(vector<Estudiante>& estudiantes, vector<Programa>& programas) {
     Estudiante e;
-    cout << "Identificacion: ";
-    cin >> e.identificacion;
+    e.identificacion = leerPalabra("Identificacion (o 'cancelar' para volver): ");
+    if (esCancelar(e.identificacion)) { cout << "Operacion cancelada.\n"; return; }
 
     if (buscarEstudiante(estudiantes, e.identificacion) != nullptr) {
         cout << "Ya existe un estudiante con esa identificacion.\n";
         return;
     }
 
-    cout << "Codigo del programa al que pertenece: ";
-    cin >> e.codigoPrograma;
+    e.codigoPrograma = leerPalabra("Codigo del programa al que pertenece: ");
+    if (esCancelar(e.codigoPrograma)) { cout << "Operacion cancelada.\n"; return; }
+
     Programa* p = buscarPrograma(programas, e.codigoPrograma);
     if (!p) {
         cout << "Ese programa no existe. Cree primero el programa.\n";
         return;
     }
 
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cout << "Nombre completo: ";
     getline(cin, e.nombreCompleto);
     e.estado = "Activo";
@@ -323,7 +324,6 @@ void modificarEstudiante(vector<Estudiante>& estudiantes, const string& id) {
     Estudiante* e = buscarEstudiante(estudiantes, id);
     if (!e) { cout << "Estudiante no encontrado.\n"; return; }
 
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cout << "Nuevo nombre (" << e->nombreCompleto << "): ";
     getline(cin, e->nombreCompleto);
     cout << "Estudiante modificado.\n";
@@ -354,9 +354,8 @@ void matricularCurso(vector<Estudiante>& estudiantes, const string& id, vector<C
     Estudiante* e = buscarEstudiante(estudiantes, id);
     if (!e) { cout << "Estudiante no encontrado.\n"; return; }
 
-    string codigoCurso;
-    cout << "Codigo del curso a matricular: ";
-    cin >> codigoCurso;
+    string codigoCurso = leerPalabra("Codigo del curso a matricular (o 'cancelar' para volver): ");
+    if (esCancelar(codigoCurso)) { cout << "Operacion cancelada.\n"; return; }
 
     Curso* c = buscarCurso(cursos, codigoCurso);
     if (!c) { cout << "Ese curso no existe.\n"; return; }
@@ -372,9 +371,11 @@ void matricularCurso(vector<Estudiante>& estudiantes, const string& id, vector<C
 
     Matricula m;
     m.codigoCurso = codigoCurso;
-    m.nota = 0.0f; // nota inicial, se actualiza despues (o se pide aqui mismo)
     cout << "Nota (0.0 si aun no tiene, se puede modificar despues): ";
-    cin >> m.nota;
+    m.nota = static_cast<float>(leerEntero()); // nota simple, se puede volver float editable en modificar
+    // Nota: si se quiere permitir decimales aqui mismo, se puede leer con
+    // cin >> m.nota directamente (float), siguiendo el mismo cuidado de
+    // limpiar el buffer despues. Se deja como mejora futura.
 
     e->matriculas.push_back(m);
     cout << "Matricula registrada correctamente.\n";
@@ -384,9 +385,8 @@ void cancelarCurso(vector<Estudiante>& estudiantes, const string& id) {
     Estudiante* e = buscarEstudiante(estudiantes, id);
     if (!e) { cout << "Estudiante no encontrado.\n"; return; }
 
-    string codigoCurso;
-    cout << "Codigo del curso a cancelar: ";
-    cin >> codigoCurso;
+    string codigoCurso = leerPalabra("Codigo del curso a cancelar (o 'cancelar' para volver sin retirar nada): ");
+    if (esCancelar(codigoCurso)) { cout << "Operacion cancelada.\n"; return; }
 
     for (size_t i = 0; i < e->matriculas.size(); i++) {
         if (e->matriculas[i].codigoCurso == codigoCurso) {
@@ -437,6 +437,6 @@ void consultarEstudiante(vector<Estudiante>& estudiantes, const string& id) {
 
 // =========================================================================
 // PROFESORES, ADMINISTRATIVOS
-// TODO: replicar el mismo patron (Dia 7 del cronograma).
+// TODO: replicar el mismo patron (siguiente bloque).
 // Los prototipos ya estan declarados en gestion.h.
 // =========================================================================

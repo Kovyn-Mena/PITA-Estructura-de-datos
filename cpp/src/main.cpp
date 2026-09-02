@@ -18,6 +18,12 @@ const string RUTA_MATRICULAS = "data/matriculas.txt";
 // dibujarse, y hace pausar() DESPUES de cada accion (excepto "Volver").
 // Asi el usuario siempre alcanza a leer el resultado de lo que hizo antes
 // de que la pantalla se borre para mostrar el menu de nuevo.
+//
+// NOTA DE DISEÑO (confirmacion): las acciones irreversibles (Eliminar,
+// que es borrado FISICO) piden confirmacion con leerSiNo() antes de
+// ejecutarse. Si el usuario responde 'n', la operacion se cancela sin
+// tocar los datos — asi siempre hay forma de "volver atras" antes de
+// una accion que no se puede deshacer.
 
 void menuFacultades(vector<Facultad>& facultades) {
     int opcion = -1;
@@ -25,8 +31,7 @@ void menuFacultades(vector<Facultad>& facultades) {
         limpiarPantalla();
         cout << "\n--- Menu Facultades ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
-        cout << "Opcion: ";
-        opcion = leerOpcion();
+        opcion = leerOpcionInmediata("Opcion: ");
 
         string codigo;
         switch (opcion) {
@@ -44,7 +49,11 @@ void menuFacultades(vector<Facultad>& facultades) {
                 break;
             case 5:
                 cout << "Codigo a eliminar: "; cin >> codigo;
-                eliminarFacultad(facultades, codigo);
+                if (leerSiNo("Esta accion NO se puede deshacer. Confirma? (s/n): ") == 's') {
+                    eliminarFacultad(facultades, codigo);
+                } else {
+                    cout << "Operacion cancelada.\n";
+                }
                 pausar();
                 break;
             case 0: break; // "Volver" no necesita pausa
@@ -59,8 +68,7 @@ void menuProgramas(vector<Programa>& programas, vector<Facultad>& facultades) {
         limpiarPantalla();
         cout << "\n--- Menu Programas ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
-        cout << "Opcion: ";
-        opcion = leerOpcion();
+        opcion = leerOpcionInmediata("Opcion: ");
 
         string codigo;
         switch (opcion) {
@@ -78,7 +86,11 @@ void menuProgramas(vector<Programa>& programas, vector<Facultad>& facultades) {
                 break;
             case 5:
                 cout << "Codigo a eliminar: "; cin >> codigo;
-                eliminarPrograma(programas, codigo);
+                if (leerSiNo("Esta accion NO se puede deshacer. Confirma? (s/n): ") == 's') {
+                    eliminarPrograma(programas, codigo);
+                } else {
+                    cout << "Operacion cancelada.\n";
+                }
                 pausar();
                 break;
             case 0: break;
@@ -93,8 +105,7 @@ void menuCursos(vector<Curso>& cursos, vector<Programa>& programas) {
         limpiarPantalla();
         cout << "\n--- Menu Cursos ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
-        cout << "Opcion: ";
-        opcion = leerOpcion();
+        opcion = leerOpcionInmediata("Opcion: ");
 
         string codigo;
         switch (opcion) {
@@ -112,7 +123,11 @@ void menuCursos(vector<Curso>& cursos, vector<Programa>& programas) {
                 break;
             case 5:
                 cout << "Codigo a eliminar: "; cin >> codigo;
-                eliminarCurso(cursos, codigo);
+                if (leerSiNo("Esta accion NO se puede deshacer. Confirma? (s/n): ") == 's') {
+                    eliminarCurso(cursos, codigo);
+                } else {
+                    cout << "Operacion cancelada.\n";
+                }
                 pausar();
                 break;
             case 0: break;
@@ -128,8 +143,8 @@ void menuEstudiantes(vector<Estudiante>& estudiantes, vector<Programa>& programa
         cout << "\n--- Menu Estudiantes ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n";
         cout << "6. Matricular curso\n7. Cancelar curso\n8. Ver ficha (promedio + alerta EBRA)\n";
-        cout << "0. Volver\nOpcion: ";
-        opcion = leerOpcion();
+        cout << "0. Volver\n";
+        opcion = leerOpcionInmediata("Opcion: ");
 
         string id;
         switch (opcion) {
@@ -147,7 +162,11 @@ void menuEstudiantes(vector<Estudiante>& estudiantes, vector<Programa>& programa
                 break;
             case 5:
                 cout << "Identificacion a eliminar: "; cin >> id;
-                eliminarEstudiante(estudiantes, id);
+                if (leerSiNo("Esta accion NO se puede deshacer. Confirma? (s/n): ") == 's') {
+                    eliminarEstudiante(estudiantes, id);
+                } else {
+                    cout << "Operacion cancelada.\n";
+                }
                 pausar();
                 break;
             case 6:
@@ -186,6 +205,9 @@ int main() {
     // Requisito del taller: el usuario decide si cargar datos existentes.
     // leerSiNo() detecta la respuesta con una sola tecla, sin esperar ENTER,
     // y no deja avanzar si se digita algo distinto de 's' o 'n'.
+    // Si el usuario se equivoca aqui, no queda atrapado: en el menu
+    // principal existe la opcion "Recargar datos desde archivo" (8) para
+    // corregirlo sin tener que cerrar y volver a abrir el programa.
     char respuesta = leerSiNo("\nDesea cargar los datos existentes? (s/n): ");
     if (respuesta == 's') {
         facultades = cargarFacultades(RUTA_FACULTADES);
@@ -211,9 +233,9 @@ int main() {
         cout << "5. Gestionar Profesores      [TODO]\n";
         cout << "6. Gestionar Administrativos [TODO]\n";
         cout << "7. Simular nomina de un profesor (demo)\n";
+        cout << "8. Recargar datos desde archivo\n";
         cout << "0. Guardar y salir\n";
-        cout << "Opcion: ";
-        opcionPrincipal = leerOpcion();
+        opcionPrincipal = leerOpcionInmediata("Opcion: ");
 
         switch (opcionPrincipal) {
             case 1:
@@ -246,6 +268,24 @@ int main() {
                 pausar();
                 break;
             }
+            case 8:
+                // "Volver atras" ante un error al inicio: descarta lo que
+                // haya en memoria (sin guardar) y recarga tal cual esta
+                // en disco. Pide confirmacion porque SI se pierden cambios
+                // no guardados.
+                if (leerSiNo("Se perdera lo que no haya guardado. Continuar? (s/n): ") == 's') {
+                    facultades = cargarFacultades(RUTA_FACULTADES);
+                    programas = cargarProgramas(RUTA_PROGRAMAS);
+                    cursos = cargarCursos(RUTA_CURSOS);
+                    estudiantes = cargarEstudiantes(RUTA_ESTUDIANTES, RUTA_MATRICULAS);
+                    cout << "Datos recargados desde archivo: " << facultades.size() << " facultad(es), "
+                         << programas.size() << " programa(s), " << cursos.size() << " curso(s), "
+                         << estudiantes.size() << " estudiante(s).\n";
+                } else {
+                    cout << "Operacion cancelada.\n";
+                }
+                pausar();
+                break;
             case 0:
                 guardarFacultades(facultades, RUTA_FACULTADES);
                 guardarProgramas(programas, RUTA_PROGRAMAS);

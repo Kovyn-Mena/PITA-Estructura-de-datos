@@ -1,7 +1,7 @@
 #include "../include/interfaz.h"
 #include <iostream>
-#include <limits>
 #include <cctype>
+#include <limits>
 
 // La consola NO se controla igual en todos los sistemas operativos.
 // Windows tiene sus propias librerias (conio.h) para leer teclas sueltas;
@@ -25,31 +25,12 @@ void limpiarPantalla() {
 #endif
 }
 
-void pausar() {
-    cout << "\nPresione ENTER para continuar...";
-    cin.clear();
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
-    cin.get();
-}
-
-int leerOpcion() {
-    int valor;
-    cin >> valor;
-    if (cin.fail()) {
-        cin.clear();
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        return -1; // valor invalido, no coincide con ningun caso del menu
-    }
-    return valor;
-}
-
 // Lee UN SOLO caracter sin esperar ENTER. Es una funcion "privada" de
-// este archivo (static): nadie fuera de aqui la necesita directamente,
-// solo leerSiNo() la usa internamente.
+// este archivo (static): solo la usan las funciones publicas de aqui abajo.
 static char leerCaracterInmediato() {
 #ifdef _WIN32
     char c = _getch();       // _getch() de Windows: lee y NO muestra el caracter
-    cout << c;                // lo mostramos nosotros para que el usuario vea que escribio
+    cout << c;                 // lo mostramos nosotros para que el usuario vea que escribio
     return c;
 #else
     char c;
@@ -62,11 +43,35 @@ static char leerCaracterInmediato() {
     //  al programa; al desactivarlo, cada tecla llega de inmediato)
     tcsetattr(STDIN_FILENO, TCSANOW, &configuracionNueva);
 
-    c = getchar(); // ahora si lee una sola tecla, sin esperar ENTER
+    c = getchar(); // lee una sola tecla, sin esperar ENTER
+
+    // Si el usuario presiono una tecla extra por costumbre (ej. ENTER
+    // despues de "s"), esa tecla queda esperando sin usarse. Se descarta
+    // aqui para que no interfiera con la siguiente lectura del programa.
+    tcflush(STDIN_FILENO, TCIFLUSH);
 
     tcsetattr(STDIN_FILENO, TCSANOW, &configuracionOriginal); // restaurar la terminal
     return c;
 #endif
+}
+
+void pausar() {
+    cout << "\nPresione una tecla para continuar...";
+    leerCaracterInmediato(); // NO importa cual tecla sea, cualquiera continua
+    cout << "\n";
+}
+
+int leerOpcionInmediata(const string& mensaje) {
+    char c;
+    while (true) {
+        cout << mensaje;
+        c = leerCaracterInmediato();
+        cout << "\n";
+        if (isdigit(static_cast<unsigned char>(c))) {
+            return c - '0'; // convierte el caracter '0'-'9' al numero real
+        }
+        cout << "Opcion invalida. Ingrese un numero de las opciones mostradas.\n";
+    }
 }
 
 char leerSiNo(const string& mensaje) {
@@ -77,5 +82,36 @@ char leerSiNo(const string& mensaje) {
         cout << "\n";
         if (c == 's' || c == 'n') return c;
         cout << "Opcion invalida. Por favor ingrese 's' o 'n'.\n";
+    }
+}
+
+string leerPalabra(const string& mensaje) {
+    string palabra;
+    cout << mensaje;
+    cin >> palabra;
+    // Deja el buffer limpio (sin '\n' pendiente) para que un getline()
+    // que venga despues no se salte una linea por error.
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    return palabra;
+}
+
+bool esCancelar(const string& texto) {
+    string copia = texto;
+    for (auto& c : copia) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    return copia == "cancelar";
+}
+
+int leerEntero() {
+    int valor;
+    while (true) {
+        cin >> valor;
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "Entrada invalida. Ingrese un numero: ";
+            continue;
+        }
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        return valor;
     }
 }
