@@ -1,2 +1,12 @@
 EDD1|Estructura de Datos|3||SIS|1
-PROG1|Programacion 1|4||SIS|1
+PROG1|Programacion 1|4|P001|SIS|1
+PROC1|Procesos Industriales|3|P002|IND|1
+EST1|Estadistica Industrial|3||IND|1
+CONT1|Contabilidad Basica|3|P003|ADM|1
+MERC1|Mercadeo|3||ADM|1
+TRIB1|Legislacion Tributaria|3|P004|CP|1
+COST1|Costos I|3||CP|1
+ANAT1|Anatomia|4|P005|MED|1
+FISIO1|Fisiologia|4||MED|1
+FUND1|Fundamentos de Enfermeria|3|P006|ENF|1
+FARM1|Farmacologia|3||ENF|1

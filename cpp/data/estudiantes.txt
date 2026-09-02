@@ -1,2 +1,12 @@
 1065800001|Juan Perez|SIS|Activo|1
 1065800002|Ana Gomez|SIS|Activo|1
+1073900010|Camilo Rivas|IND|Activo|1
+1073900011|Sofia Martinez|IND|Activo|1
+1004500020|Pedro Leon|ADM|Activo|1
+1004500021|Valentina Ruiz|ADM|Activo|1
+1098700030|Miguel Herrera|CP|Graduado|0
+1098700031|Laura Jimenez|CP|Activo|1
+1122300040|Daniela Ortiz|MED|Activo|1
+1122300041|Santiago Vargas|MED|Activo|1
+1156800050|Isabella Moreno|ENF|Activo|1
+1156800051|Nicolas Castillo|ENF|Activo|1

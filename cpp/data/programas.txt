@@ -1,1 +1,6 @@
 SIS|Ingenieria de Sistemas|Pregrado|FIS|1
+IND|Ingenieria Industrial|Pregrado|FIS|1
+ADM|Administracion de Empresas|Pregrado|FCA|1
+CP|Contaduria Publica|Pregrado|FCA|1
+MED|Medicina|Pregrado|FCS|1
+ENF|Enfermeria|Pregrado|FCS|1
