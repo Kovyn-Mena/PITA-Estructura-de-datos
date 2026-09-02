@@ -1,0 +1,2 @@
+1065800001|Juan Perez|SIS|Activo|1
+1065800002|Ana Gomez|SIS|Activo|1

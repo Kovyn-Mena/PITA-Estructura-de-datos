@@ -10,6 +10,8 @@ using namespace std;
 const string RUTA_FACULTADES = "data/facultades.txt";
 const string RUTA_PROGRAMAS = "data/programas.txt";
 const string RUTA_CURSOS = "data/cursos.txt";
+const string RUTA_ESTUDIANTES = "data/estudiantes.txt";
+const string RUTA_MATRICULAS = "data/matriculas.txt";
 // TODO: agregar rutas de los demas archivos de datos a medida que se implementen.
 
 // Lee un entero de forma segura: si el usuario escribe texto en vez de un
@@ -116,6 +118,49 @@ void menuCursos(vector<Curso>& cursos, vector<Programa>& programas) {
     } while (opcion != 0);
 }
 
+void menuEstudiantes(vector<Estudiante>& estudiantes, vector<Programa>& programas, vector<Curso>& cursos) {
+    int opcion = -1;
+    do {
+        cout << "\n--- Menu Estudiantes ---\n";
+        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n";
+        cout << "6. Matricular curso\n7. Cancelar curso\n8. Ver ficha (promedio + alerta EBRA)\n";
+        cout << "0. Volver\nOpcion: ";
+        opcion = leerOpcion();
+
+        string id;
+        switch (opcion) {
+            case 1: crearEstudiante(estudiantes, programas); break;
+            case 2: listarEstudiantes(estudiantes); break;
+            case 3:
+                cout << "Identificacion a modificar: "; cin >> id;
+                modificarEstudiante(estudiantes, id);
+                break;
+            case 4:
+                cout << "Identificacion a desactivar: "; cin >> id;
+                desactivarEstudiante(estudiantes, id);
+                break;
+            case 5:
+                cout << "Identificacion a eliminar: "; cin >> id;
+                eliminarEstudiante(estudiantes, id);
+                break;
+            case 6:
+                cout << "Identificacion del estudiante: "; cin >> id;
+                matricularCurso(estudiantes, id, cursos);
+                break;
+            case 7:
+                cout << "Identificacion del estudiante: "; cin >> id;
+                cancelarCurso(estudiantes, id);
+                break;
+            case 8:
+                cout << "Identificacion del estudiante: "; cin >> id;
+                consultarEstudiante(estudiantes, id);
+                break;
+            case 0: break;
+            default: cout << "Opcion invalida.\n";
+        }
+    } while (opcion != 0);
+}
+
 int main() {
     cout << "=====================================================\n";
     cout << " PITA - Programa Integrado de Transacciones Academicas\n";
@@ -125,6 +170,7 @@ int main() {
     vector<Facultad> facultades;
     vector<Programa> programas;
     vector<Curso> cursos;
+    vector<Estudiante> estudiantes;
 
     // Requisito del taller: el usuario decide si cargar datos existentes.
     char respuesta;
@@ -134,8 +180,10 @@ int main() {
         facultades = cargarFacultades(RUTA_FACULTADES);
         programas = cargarProgramas(RUTA_PROGRAMAS);
         cursos = cargarCursos(RUTA_CURSOS);
+        estudiantes = cargarEstudiantes(RUTA_ESTUDIANTES, RUTA_MATRICULAS);
         cout << "Datos cargados: " << facultades.size() << " facultad(es), "
-             << programas.size() << " programa(s), " << cursos.size() << " curso(s).\n";
+             << programas.size() << " programa(s), " << cursos.size() << " curso(s), "
+             << estudiantes.size() << " estudiante(s).\n";
     } else {
         cout << "Iniciando sin datos precargados.\n";
     }
@@ -146,7 +194,7 @@ int main() {
         cout << "1. Gestionar Facultades\n";
         cout << "2. Gestionar Programas\n";
         cout << "3. Gestionar Cursos\n";
-        cout << "4. Gestionar Estudiantes     [TODO]\n";
+        cout << "4. Gestionar Estudiantes\n";
         cout << "5. Gestionar Profesores      [TODO]\n";
         cout << "6. Gestionar Administrativos [TODO]\n";
         cout << "7. Simular nomina de un profesor (demo)\n";
@@ -163,6 +211,9 @@ int main() {
                 break;
             case 3:
                 menuCursos(cursos, programas);
+                break;
+            case 4:
+                menuEstudiantes(estudiantes, programas, cursos);
                 break;
             case 7: {
                 // Profesor de ejemplo para demostrar el modulo de nomina
@@ -185,6 +236,7 @@ int main() {
                 guardarFacultades(facultades, RUTA_FACULTADES);
                 guardarProgramas(programas, RUTA_PROGRAMAS);
                 guardarCursos(cursos, RUTA_CURSOS);
+                guardarEstudiantes(estudiantes, RUTA_ESTUDIANTES, RUTA_MATRICULAS);
                 cout << "Datos guardados. Hasta luego.\n";
                 break;
             default:

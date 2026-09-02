@@ -137,6 +137,83 @@ vector<Curso> cargarCursos(const string& ruta) {
 }
 
 // =========================================================================
-// TODO: implementar guardar/cargar para Estudiante (con matriculas),
-// Profesor y Administrativo, siguiendo el mismo patron.
+// ESTUDIANTES — se guardan en DOS archivos: uno con los datos del
+// estudiante, otro con la relacion estudiante-curso-nota (matriculas).
+// Se separan para no repetir el nombre del estudiante en cada matricula.
+// =========================================================================
+
+void guardarEstudiantes(const vector<Estudiante>& v, const string& rutaEst, const string& rutaMatriculas) {
+    ofstream archivoEst(rutaEst);
+    if (!archivoEst.is_open()) {
+        cout << "No se pudo abrir " << rutaEst << " para escritura.\n";
+        return;
+    }
+    for (const auto& e : v) {
+        archivoEst << e.identificacion << "|" << e.nombreCompleto << "|"
+                   << e.codigoPrograma << "|" << e.estado << "|"
+                   << (e.activo ? 1 : 0) << "\n";
+    }
+    archivoEst.close();
+
+    ofstream archivoMat(rutaMatriculas);
+    if (!archivoMat.is_open()) {
+        cout << "No se pudo abrir " << rutaMatriculas << " para escritura.\n";
+        return;
+    }
+    for (const auto& e : v) {
+        for (const auto& m : e.matriculas) {
+            archivoMat << e.identificacion << "|" << m.codigoCurso << "|" << m.nota << "\n";
+        }
+    }
+    archivoMat.close();
+}
+
+vector<Estudiante> cargarEstudiantes(const string& rutaEst, const string& rutaMatriculas) {
+    vector<Estudiante> resultado;
+    ifstream archivoEst(rutaEst);
+    if (!archivoEst.is_open()) return resultado;
+
+    string linea;
+    while (getline(archivoEst, linea)) {
+        if (linea.empty()) continue;
+        vector<string> campos = split(linea, '|');
+        if (campos.size() < 5) continue;
+        Estudiante e;
+        e.identificacion = campos[0];
+        e.nombreCompleto = campos[1];
+        e.codigoPrograma = campos[2];
+        e.estado = campos[3];
+        e.activo = (campos[4] == "1");
+        resultado.push_back(e);
+    }
+    archivoEst.close();
+
+    // Segunda pasada: cargar matriculas y asociarlas al estudiante correcto
+    ifstream archivoMat(rutaMatriculas);
+    if (archivoMat.is_open()) {
+        while (getline(archivoMat, linea)) {
+            if (linea.empty()) continue;
+            vector<string> campos = split(linea, '|');
+            if (campos.size() < 3) continue;
+            string idEstudiante = campos[0];
+            Matricula m;
+            m.codigoCurso = campos[1];
+            m.nota = stof(campos[2]);
+
+            for (auto& e : resultado) {
+                if (e.identificacion == idEstudiante) {
+                    e.matriculas.push_back(m);
+                    break;
+                }
+            }
+        }
+        archivoMat.close();
+    }
+
+    return resultado;
+}
+
+// =========================================================================
+// TODO: implementar guardar/cargar para Profesor y Administrativo,
+// siguiendo el mismo patron.
 // =========================================================================

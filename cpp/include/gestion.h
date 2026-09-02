@@ -30,17 +30,18 @@ void desactivarCurso(std::vector<Curso>& cursos, const std::string& codigo);
 void eliminarCurso(std::vector<Curso>& cursos, const std::string& codigo);
 
 // ===================== ESTUDIANTES =====================
-void crearEstudiante(std::vector<Estudiante>& estudiantes);
+void crearEstudiante(std::vector<Estudiante>& estudiantes, std::vector<Programa>& programas);
 void listarEstudiantes(const std::vector<Estudiante>& estudiantes);
 Estudiante* buscarEstudiante(std::vector<Estudiante>& estudiantes, const std::string& id);
 void modificarEstudiante(std::vector<Estudiante>& estudiantes, const std::string& id);
 void desactivarEstudiante(std::vector<Estudiante>& estudiantes, const std::string& id);
 void eliminarEstudiante(std::vector<Estudiante>& estudiantes, const std::string& id);
 
-void matricularCurso(std::vector<Estudiante>& estudiantes, const std::string& id, const std::string& codigoCurso);
-void cancelarCurso(std::vector<Estudiante>& estudiantes, const std::string& id, const std::string& codigoCurso);
+void matricularCurso(std::vector<Estudiante>& estudiantes, const std::string& id, std::vector<Curso>& cursos);
+void cancelarCurso(std::vector<Estudiante>& estudiantes, const std::string& id);
 float calcularPromedio(const Estudiante& e);
 bool estaEnRiesgoEbra(const Estudiante& e); // promedio < 3.25
+void consultarEstudiante(std::vector<Estudiante>& estudiantes, const std::string& id);
 
 // ===================== PROFESORES =====================
 void crearProfesor(std::vector<Profesor>& profesores);

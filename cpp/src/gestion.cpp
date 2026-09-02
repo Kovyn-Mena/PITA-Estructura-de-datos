@@ -263,7 +263,180 @@ void eliminarCurso(vector<Curso>& cursos, const string& codigo) {
 }
 
 // =========================================================================
-// ESTUDIANTES, PROFESORES, ADMINISTRATIVOS
-// TODO: replicar el mismo patron (Dia 6-7 del cronograma).
+// ESTUDIANTES — mismo patron, mas dos operaciones propias del negocio
+// academico: matricular/cancelar curso, y el calculo de promedio + EBRA.
+// La lista de matriculas vive DENTRO de cada Estudiante (lista anidada).
+// =========================================================================
+
+void crearEstudiante(vector<Estudiante>& estudiantes, vector<Programa>& programas) {
+    Estudiante e;
+    cout << "Identificacion: ";
+    cin >> e.identificacion;
+
+    if (buscarEstudiante(estudiantes, e.identificacion) != nullptr) {
+        cout << "Ya existe un estudiante con esa identificacion.\n";
+        return;
+    }
+
+    cout << "Codigo del programa al que pertenece: ";
+    cin >> e.codigoPrograma;
+    Programa* p = buscarPrograma(programas, e.codigoPrograma);
+    if (!p) {
+        cout << "Ese programa no existe. Cree primero el programa.\n";
+        return;
+    }
+
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cout << "Nombre completo: ";
+    getline(cin, e.nombreCompleto);
+    e.estado = "Activo";
+    e.activo = true;
+    // e.matriculas queda vacio; se llena con matricularCurso()
+
+    estudiantes.push_back(e);
+    cout << "Estudiante creado correctamente.\n";
+}
+
+void listarEstudiantes(const vector<Estudiante>& estudiantes) {
+    cout << "\n--- Estudiantes registrados ---\n";
+    if (estudiantes.empty()) {
+        cout << "(no hay estudiantes registrados)\n";
+        return;
+    }
+    for (const auto& e : estudiantes) {
+        cout << e.identificacion << " | " << e.nombreCompleto
+             << " | Programa: " << e.codigoPrograma
+             << " | " << e.estado
+             << " | " << (e.activo ? "Activo" : "Inactivo")
+             << " | Cursos matriculados: " << e.matriculas.size() << "\n";
+    }
+}
+
+Estudiante* buscarEstudiante(vector<Estudiante>& estudiantes, const string& id) {
+    for (auto& e : estudiantes) {
+        if (e.identificacion == id) return &e;
+    }
+    return nullptr;
+}
+
+void modificarEstudiante(vector<Estudiante>& estudiantes, const string& id) {
+    Estudiante* e = buscarEstudiante(estudiantes, id);
+    if (!e) { cout << "Estudiante no encontrado.\n"; return; }
+
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cout << "Nuevo nombre (" << e->nombreCompleto << "): ";
+    getline(cin, e->nombreCompleto);
+    cout << "Estudiante modificado.\n";
+}
+
+void desactivarEstudiante(vector<Estudiante>& estudiantes, const string& id) {
+    Estudiante* e = buscarEstudiante(estudiantes, id);
+    if (!e) { cout << "Estudiante no encontrado.\n"; return; }
+    e->activo = false;
+    e->estado = "Inactivo";
+    cout << "Estudiante desactivado (borrado logico).\n";
+}
+
+void eliminarEstudiante(vector<Estudiante>& estudiantes, const string& id) {
+    for (size_t i = 0; i < estudiantes.size(); i++) {
+        if (estudiantes[i].identificacion == id) {
+            estudiantes.erase(estudiantes.begin() + i);
+            cout << "Estudiante eliminado permanentemente.\n";
+            return;
+        }
+    }
+    cout << "Estudiante no encontrado.\n";
+}
+
+// ---- Matricula / cancelacion (operan sobre la lista anidada) ----
+
+void matricularCurso(vector<Estudiante>& estudiantes, const string& id, vector<Curso>& cursos) {
+    Estudiante* e = buscarEstudiante(estudiantes, id);
+    if (!e) { cout << "Estudiante no encontrado.\n"; return; }
+
+    string codigoCurso;
+    cout << "Codigo del curso a matricular: ";
+    cin >> codigoCurso;
+
+    Curso* c = buscarCurso(cursos, codigoCurso);
+    if (!c) { cout << "Ese curso no existe.\n"; return; }
+    if (!c->activo) { cout << "Ese curso esta inactivo.\n"; return; }
+
+    // Evitar doble matricula en el mismo curso
+    for (const auto& m : e->matriculas) {
+        if (m.codigoCurso == codigoCurso) {
+            cout << "El estudiante ya esta matriculado en ese curso.\n";
+            return;
+        }
+    }
+
+    Matricula m;
+    m.codigoCurso = codigoCurso;
+    m.nota = 0.0f; // nota inicial, se actualiza despues (o se pide aqui mismo)
+    cout << "Nota (0.0 si aun no tiene, se puede modificar despues): ";
+    cin >> m.nota;
+
+    e->matriculas.push_back(m);
+    cout << "Matricula registrada correctamente.\n";
+}
+
+void cancelarCurso(vector<Estudiante>& estudiantes, const string& id) {
+    Estudiante* e = buscarEstudiante(estudiantes, id);
+    if (!e) { cout << "Estudiante no encontrado.\n"; return; }
+
+    string codigoCurso;
+    cout << "Codigo del curso a cancelar: ";
+    cin >> codigoCurso;
+
+    for (size_t i = 0; i < e->matriculas.size(); i++) {
+        if (e->matriculas[i].codigoCurso == codigoCurso) {
+            e->matriculas.erase(e->matriculas.begin() + i);
+            cout << "Curso cancelado (retirado de la matricula).\n";
+            return;
+        }
+    }
+    cout << "El estudiante no esta matriculado en ese curso.\n";
+}
+
+// ---- Promedio y alerta EBRA ----
+
+float calcularPromedio(const Estudiante& e) {
+    if (e.matriculas.empty()) return 0.0f;
+    float suma = 0.0f;
+    for (const auto& m : e.matriculas) suma += m.nota;
+    return suma / e.matriculas.size();
+}
+
+bool estaEnRiesgoEbra(const Estudiante& e) {
+    // EBRA: riesgo de desercion academica, promedio por debajo de 3.25
+    return calcularPromedio(e) < 3.25f;
+}
+
+void consultarEstudiante(vector<Estudiante>& estudiantes, const string& id) {
+    Estudiante* e = buscarEstudiante(estudiantes, id);
+    if (!e) { cout << "Estudiante no encontrado.\n"; return; }
+
+    cout << "\n===== Ficha del estudiante =====\n";
+    cout << "ID: " << e->identificacion << " | " << e->nombreCompleto << "\n";
+    cout << "Programa: " << e->codigoPrograma << " | Estado: " << e->estado << "\n";
+    cout << "Cursos matriculados:\n";
+    if (e->matriculas.empty()) {
+        cout << "  (ninguno)\n";
+    } else {
+        for (const auto& m : e->matriculas) {
+            cout << "  " << m.codigoCurso << " -> nota: " << m.nota << "\n";
+        }
+    }
+    cout << "Promedio acumulado: " << calcularPromedio(*e) << "\n";
+    if (estaEnRiesgoEbra(*e)) {
+        cout << "*** ALERTA EBRA: estudiante en riesgo de desercion academica"
+             << " (promedio < 3.25) ***\n";
+    }
+    cout << "=================================\n";
+}
+
+// =========================================================================
+// PROFESORES, ADMINISTRATIVOS
+// TODO: replicar el mismo patron (Dia 7 del cronograma).
 // Los prototipos ya estan declarados en gestion.h.
 // =========================================================================
