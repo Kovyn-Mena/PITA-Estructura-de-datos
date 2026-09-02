@@ -2,8 +2,8 @@
 #include "../include/gestion.h"
 #include "../include/nomina.h"
 #include "../include/persistencia.h"
+#include "../include/interfaz.h"
 #include <iostream>
-#include <limits>
 
 using namespace std;
 
@@ -14,23 +14,15 @@ const string RUTA_ESTUDIANTES = "data/estudiantes.txt";
 const string RUTA_MATRICULAS = "data/matriculas.txt";
 // TODO: agregar rutas de los demas archivos de datos a medida que se implementen.
 
-// Lee un entero de forma segura: si el usuario escribe texto en vez de un
-// numero, cin queda en estado de error y (sin este manejo) el programa
-// entra en loop infinito. Se limpia el error y se descarta la linea mala.
-int leerOpcion() {
-    int valor;
-    cin >> valor;
-    if (cin.fail()) {
-        cin.clear();
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        return -1; // valor invalido, no coincide con ningun caso del menu
-    }
-    return valor;
-}
+// NOTA DE DISEÑO (pantalla): cada menu limpia la pantalla ANTES de
+// dibujarse, y hace pausar() DESPUES de cada accion (excepto "Volver").
+// Asi el usuario siempre alcanza a leer el resultado de lo que hizo antes
+// de que la pantalla se borre para mostrar el menu de nuevo.
 
 void menuFacultades(vector<Facultad>& facultades) {
     int opcion = -1;
     do {
+        limpiarPantalla();
         cout << "\n--- Menu Facultades ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
         cout << "Opcion: ";
@@ -38,22 +30,25 @@ void menuFacultades(vector<Facultad>& facultades) {
 
         string codigo;
         switch (opcion) {
-            case 1: crearFacultad(facultades); break;
-            case 2: listarFacultades(facultades); break;
+            case 1: crearFacultad(facultades); pausar(); break;
+            case 2: listarFacultades(facultades); pausar(); break;
             case 3:
                 cout << "Codigo a modificar: "; cin >> codigo;
                 modificarFacultad(facultades, codigo);
+                pausar();
                 break;
             case 4:
                 cout << "Codigo a desactivar: "; cin >> codigo;
                 desactivarFacultad(facultades, codigo);
+                pausar();
                 break;
             case 5:
                 cout << "Codigo a eliminar: "; cin >> codigo;
                 eliminarFacultad(facultades, codigo);
+                pausar();
                 break;
-            case 0: break;
-            default: cout << "Opcion invalida.\n";
+            case 0: break; // "Volver" no necesita pausa
+            default: cout << "Opcion invalida.\n"; pausar();
         }
     } while (opcion != 0);
 }
@@ -61,6 +56,7 @@ void menuFacultades(vector<Facultad>& facultades) {
 void menuProgramas(vector<Programa>& programas, vector<Facultad>& facultades) {
     int opcion = -1;
     do {
+        limpiarPantalla();
         cout << "\n--- Menu Programas ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
         cout << "Opcion: ";
@@ -68,22 +64,25 @@ void menuProgramas(vector<Programa>& programas, vector<Facultad>& facultades) {
 
         string codigo;
         switch (opcion) {
-            case 1: crearPrograma(programas, facultades); break;
-            case 2: listarProgramas(programas); break;
+            case 1: crearPrograma(programas, facultades); pausar(); break;
+            case 2: listarProgramas(programas); pausar(); break;
             case 3:
                 cout << "Codigo a modificar: "; cin >> codigo;
                 modificarPrograma(programas, codigo);
+                pausar();
                 break;
             case 4:
                 cout << "Codigo a desactivar: "; cin >> codigo;
                 desactivarPrograma(programas, codigo);
+                pausar();
                 break;
             case 5:
                 cout << "Codigo a eliminar: "; cin >> codigo;
                 eliminarPrograma(programas, codigo);
+                pausar();
                 break;
             case 0: break;
-            default: cout << "Opcion invalida.\n";
+            default: cout << "Opcion invalida.\n"; pausar();
         }
     } while (opcion != 0);
 }
@@ -91,6 +90,7 @@ void menuProgramas(vector<Programa>& programas, vector<Facultad>& facultades) {
 void menuCursos(vector<Curso>& cursos, vector<Programa>& programas) {
     int opcion = -1;
     do {
+        limpiarPantalla();
         cout << "\n--- Menu Cursos ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
         cout << "Opcion: ";
@@ -98,22 +98,25 @@ void menuCursos(vector<Curso>& cursos, vector<Programa>& programas) {
 
         string codigo;
         switch (opcion) {
-            case 1: crearCurso(cursos, programas); break;
-            case 2: listarCursos(cursos); break;
+            case 1: crearCurso(cursos, programas); pausar(); break;
+            case 2: listarCursos(cursos); pausar(); break;
             case 3:
                 cout << "Codigo a modificar: "; cin >> codigo;
                 modificarCurso(cursos, codigo);
+                pausar();
                 break;
             case 4:
                 cout << "Codigo a desactivar: "; cin >> codigo;
                 desactivarCurso(cursos, codigo);
+                pausar();
                 break;
             case 5:
                 cout << "Codigo a eliminar: "; cin >> codigo;
                 eliminarCurso(cursos, codigo);
+                pausar();
                 break;
             case 0: break;
-            default: cout << "Opcion invalida.\n";
+            default: cout << "Opcion invalida.\n"; pausar();
         }
     } while (opcion != 0);
 }
@@ -121,6 +124,7 @@ void menuCursos(vector<Curso>& cursos, vector<Programa>& programas) {
 void menuEstudiantes(vector<Estudiante>& estudiantes, vector<Programa>& programas, vector<Curso>& cursos) {
     int opcion = -1;
     do {
+        limpiarPantalla();
         cout << "\n--- Menu Estudiantes ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n";
         cout << "6. Matricular curso\n7. Cancelar curso\n8. Ver ficha (promedio + alerta EBRA)\n";
@@ -129,39 +133,46 @@ void menuEstudiantes(vector<Estudiante>& estudiantes, vector<Programa>& programa
 
         string id;
         switch (opcion) {
-            case 1: crearEstudiante(estudiantes, programas); break;
-            case 2: listarEstudiantes(estudiantes); break;
+            case 1: crearEstudiante(estudiantes, programas); pausar(); break;
+            case 2: listarEstudiantes(estudiantes); pausar(); break;
             case 3:
                 cout << "Identificacion a modificar: "; cin >> id;
                 modificarEstudiante(estudiantes, id);
+                pausar();
                 break;
             case 4:
                 cout << "Identificacion a desactivar: "; cin >> id;
                 desactivarEstudiante(estudiantes, id);
+                pausar();
                 break;
             case 5:
                 cout << "Identificacion a eliminar: "; cin >> id;
                 eliminarEstudiante(estudiantes, id);
+                pausar();
                 break;
             case 6:
                 cout << "Identificacion del estudiante: "; cin >> id;
                 matricularCurso(estudiantes, id, cursos);
+                pausar();
                 break;
             case 7:
                 cout << "Identificacion del estudiante: "; cin >> id;
                 cancelarCurso(estudiantes, id);
+                pausar();
                 break;
             case 8:
                 cout << "Identificacion del estudiante: "; cin >> id;
                 consultarEstudiante(estudiantes, id);
+                pausar();
                 break;
             case 0: break;
-            default: cout << "Opcion invalida.\n";
+            default: cout << "Opcion invalida.\n"; pausar();
         }
     } while (opcion != 0);
 }
 
 int main() {
+    limpiarPantalla();
     cout << "=====================================================\n";
     cout << " PITA - Programa Integrado de Transacciones Academicas\n";
     cout << " Universidad Popular del Cesar\n";
@@ -173,10 +184,10 @@ int main() {
     vector<Estudiante> estudiantes;
 
     // Requisito del taller: el usuario decide si cargar datos existentes.
-    char respuesta;
-    cout << "\nDesea cargar los datos existentes? (s/n): ";
-    cin >> respuesta;
-    if (respuesta == 's' || respuesta == 'S') {
+    // leerSiNo() detecta la respuesta con una sola tecla, sin esperar ENTER,
+    // y no deja avanzar si se digita algo distinto de 's' o 'n'.
+    char respuesta = leerSiNo("\nDesea cargar los datos existentes? (s/n): ");
+    if (respuesta == 's') {
         facultades = cargarFacultades(RUTA_FACULTADES);
         programas = cargarProgramas(RUTA_PROGRAMAS);
         cursos = cargarCursos(RUTA_CURSOS);
@@ -187,9 +198,11 @@ int main() {
     } else {
         cout << "Iniciando sin datos precargados.\n";
     }
+    pausar();
 
     int opcionPrincipal = -1;
     do {
+        limpiarPantalla();
         cout << "\n===== MENU PRINCIPAL =====\n";
         cout << "1. Gestionar Facultades\n";
         cout << "2. Gestionar Programas\n";
@@ -230,6 +243,7 @@ int main() {
                 demo.puntosProductividad = 15;
                 demo.activo = true;
                 imprimirDesgloseNomina(demo);
+                pausar();
                 break;
             }
             case 0:
@@ -241,6 +255,7 @@ int main() {
                 break;
             default:
                 cout << "Opcion no disponible todavia o invalida.\n";
+                pausar();
         }
     } while (opcionPrincipal != 0);
 
