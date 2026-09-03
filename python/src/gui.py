@@ -28,7 +28,9 @@ from gestion import (
 from nomina import (
     calcular_salario_bruto, calcular_descuento_salud, calcular_descuento_pension,
     calcular_salario_neto, calcular_prima_servicios, calcular_cesantias,
-    total_puntos, puntos_por_categoria, factor_proporcionalidad, VALOR_PUNTO,
+    total_puntos, puntos_por_categoria, factor_proporcionalidad, factor_ocasional,
+    regimen_nomina, liquidacion_disponible, observacion_normativa,
+    VALOR_PUNTO, SMMLV, PUNTOS_PREGRADO, VALOR_HORA_CATEDRA,
 )
 
 # Rutas ABSOLUTAS calculadas a partir de la ubicacion de este archivo, para
@@ -156,8 +158,11 @@ class PitaApp(tk.Tk):
         # None significa que se muestran todos los registros.
         self.filtro_facultad_programas = None
         self.filtro_programa_cursos = None
+        self.filtro_programa_estudiantes = None
+        self.filtro_curso_estudiantes = None
         self.tab_programas = None
         self.tab_cursos = None
+        self.tab_estudiantes = None
 
         self._configurar_estilo()
         self._construir_header()
@@ -441,6 +446,7 @@ class PitaApp(tk.Tk):
         ttk.Button(btns, text="Eliminar", style="Danger.TButton",
                    command=self._programa_eliminar).pack(side="left", padx=4)
         ttk.Button(btns, text="Ver cursos", command=self._ir_a_cursos_filtrados).pack(side="left", padx=4)
+        ttk.Button(btns, text="Ver estudiantes", command=self._ir_a_estudiantes_programa).pack(side="left", padx=4)
         ttk.Button(btns, text="Mostrar todos", command=self._mostrar_todos_programas).pack(side="left", padx=4)
         ttk.Button(btns, text="← Facultades", command=self._volver_a_facultades).pack(side="right", padx=4)
 
@@ -463,6 +469,12 @@ class PitaApp(tk.Tk):
 
     def _doble_click_programa(self, event=None):
         self._ir_a_cursos_filtrados()
+
+    def _doble_click_curso(self, event=None):
+        self._curso_ver_detalle()
+
+    def _doble_click_estudiante(self, event=None):
+        self._estudiante_ver_ficha()
 
     def _ir_a_programas_filtrados(self):
         f = self._facultad_seleccionada()
@@ -495,6 +507,33 @@ class PitaApp(tk.Tk):
         self.notebook.select(self.tab_cursos)
         self._set_status("Mostrando todos los cursos.")
 
+    def _ir_a_estudiantes_programa(self):
+        p = self._programa_seleccionado()
+        if not p:
+            return
+        self.filtro_programa_estudiantes = p.codigo
+        self.filtro_curso_estudiantes = None
+        self._refrescar_estudiantes()
+        self.notebook.select(self.tab_estudiantes)
+        self._set_status(f"Mostrando estudiantes del programa: {p.nombre} ({p.codigo}).")
+
+    def _ir_a_estudiantes_curso(self):
+        c = self._curso_seleccionado()
+        if not c:
+            return
+        self.filtro_curso_estudiantes = c.codigo
+        self.filtro_programa_estudiantes = None
+        self._refrescar_estudiantes()
+        self.notebook.select(self.tab_estudiantes)
+        self._set_status(f"Mostrando estudiantes matriculados en: {c.nombre} ({c.codigo}).")
+
+    def _mostrar_todos_estudiantes(self):
+        self.filtro_programa_estudiantes = None
+        self.filtro_curso_estudiantes = None
+        self._refrescar_estudiantes()
+        self.notebook.select(self.tab_estudiantes)
+        self._set_status("Mostrando todos los estudiantes.")
+
     def _volver_a_facultades(self):
         self.notebook.select(self.tab_facultades)
         self._set_status("Selecciona una facultad para consultar sus programas.")
@@ -524,6 +563,19 @@ class PitaApp(tk.Tk):
         else:
             texto = "Cursos"
         self.notebook.tab(self.tab_cursos, text=texto)
+
+    def _actualizar_titulo_estudiantes(self):
+        if self.notebook is None or self.tab_estudiantes is None:
+            return
+        if self.filtro_curso_estudiantes:
+            c = buscar_curso(self.cursos, self.filtro_curso_estudiantes)
+            texto = f"Estudiantes — {c.codigo}" if c else "Estudiantes"
+        elif self.filtro_programa_estudiantes:
+            p = buscar_programa(self.programas, self.filtro_programa_estudiantes)
+            texto = f"Estudiantes — {p.codigo}" if p else "Estudiantes"
+        else:
+            texto = "Estudiantes"
+        self.notebook.tab(self.tab_estudiantes, text=texto)
 
     def _programa_seleccionado(self):
         sel = self.tree_programas.selection()
@@ -609,9 +661,13 @@ class PitaApp(tk.Tk):
         ttk.Button(btns, text="Activar/Desactivar", command=self._curso_toggle).pack(side="left", padx=4)
         ttk.Button(btns, text="Eliminar", style="Danger.TButton",
                    command=self._curso_eliminar).pack(side="left", padx=4)
+        ttk.Button(btns, text="Ver detalle", command=self._curso_ver_detalle).pack(side="left", padx=4)
+        ttk.Button(btns, text="Ver profesor", command=self._curso_ver_profesor).pack(side="left", padx=4)
+        ttk.Button(btns, text="Ver estudiantes", command=self._ir_a_estudiantes_curso).pack(side="left", padx=4)
         ttk.Button(btns, text="Mostrar todos", command=self._mostrar_todos_cursos).pack(side="left", padx=4)
         ttk.Button(btns, text="← Programas", command=self._volver_a_programas).pack(side="right", padx=4)
 
+        self.tree_cursos.bind("<Double-1>", self._doble_click_curso)
         self._refrescar_cursos()
 
     def _refrescar_cursos(self):
@@ -700,10 +756,30 @@ class PitaApp(tk.Tk):
             self._refrescar_cursos()
             self._set_status(f"Curso {c.codigo} eliminado.")
 
+    def _curso_ver_profesor(self):
+        c = self._curso_seleccionado()
+        if not c:
+            return
+        if not c.codigo_profesor:
+            messagebox.showinfo("Profesor", "Este curso todavía no tiene profesor asignado.")
+            return
+        p = buscar_profesor(self.profesores, c.codigo_profesor)
+        if not p:
+            messagebox.showwarning("Profesor no encontrado",
+                                   f"El curso referencia al profesor {c.codigo_profesor}, pero no existe en la lista.")
+            return
+        VentanaProfesorResumen(self, p, c)
+
+    def _curso_ver_detalle(self):
+        c = self._curso_seleccionado()
+        if not c:
+            return
+        VentanaCursoDetalle(self, c)
+
     # ---------------- ESTUDIANTES ----------------
 
     def _tab_estudiantes(self):
-        _, self.tree_estudiantes, btns = self._crear_shell_tab(
+        self.tab_estudiantes, self.tree_estudiantes, btns = self._crear_shell_tab(
             "Estudiantes", ["ID", "Nombre", "Programa", "Estado", "Promedio", "EBRA"])
 
         ttk.Button(btns, text="Nuevo", style="Accent.TButton",
@@ -711,25 +787,35 @@ class PitaApp(tk.Tk):
         ttk.Button(btns, text="Editar", command=self._estudiante_editar).pack(side="left", padx=4)
         ttk.Button(btns, text="Matricular curso", command=self._estudiante_matricular).pack(side="left", padx=4)
         ttk.Button(btns, text="Cancelar curso", command=self._estudiante_cancelar_curso).pack(side="left", padx=4)
+        ttk.Button(btns, text="Ver ficha", command=self._estudiante_ver_ficha).pack(side="left", padx=4)
+        ttk.Button(btns, text="Mostrar todos", command=self._mostrar_todos_estudiantes).pack(side="left", padx=4)
         ttk.Button(btns, text="Activar/Desactivar", command=self._estudiante_toggle).pack(side="left", padx=4)
         ttk.Button(btns, text="Eliminar", style="Danger.TButton",
                    command=self._estudiante_eliminar).pack(side="left", padx=4)
 
+        self.tree_estudiantes.bind("<Double-1>", self._doble_click_estudiante)
         self._refrescar_estudiantes()
 
     def _refrescar_estudiantes(self):
         self.tree_estudiantes.delete(*self.tree_estudiantes.get_children())
+        visibles = []
         for e in self.estudiantes:
+            if self.filtro_programa_estudiantes and e.codigo_programa != self.filtro_programa_estudiantes:
+                continue
+            if self.filtro_curso_estudiantes and not any(
+                    m["codigo_curso"] == self.filtro_curso_estudiantes for m in e.matriculas):
+                continue
+            visibles.append(e)
             promedio = e.calcular_promedio()
             ebra = "⚠ EN RIESGO" if e.esta_en_riesgo_ebra() else "—"
             self.tree_estudiantes.insert("", "end", iid=e.identificacion,
                 values=(e.identificacion, e.nombre_completo, e.codigo_programa, e.estado,
                         f"{promedio:.2f}", ebra))
-        # Colorear filas en riesgo EBRA
-        for e in self.estudiantes:
+        self.tree_estudiantes.tag_configure("riesgo", foreground=C["danger"])
+        for e in visibles:
             if e.esta_en_riesgo_ebra():
-                self.tree_estudiantes.tag_configure("riesgo", foreground=C["danger"])
                 self.tree_estudiantes.item(e.identificacion, tags=("riesgo",))
+        self._actualizar_titulo_estudiantes()
 
     def _estudiante_seleccionado(self):
         sel = self.tree_estudiantes.selection()
@@ -846,6 +932,12 @@ class PitaApp(tk.Tk):
             self._set_status(f"Matrícula de {v['codigo_curso']} cancelada para {e.identificacion}.")
             return None
         Formulario(self, f"Cancelar curso — {e.nombre_completo}", campos, guardar)
+
+    def _estudiante_ver_ficha(self):
+        e = self._estudiante_seleccionado()
+        if not e:
+            return
+        VentanaEstudiante(self, e)
 
     # ---------------- PROFESORES ----------------
 
@@ -1123,19 +1215,171 @@ class PitaApp(tk.Tk):
         self.destroy()
 
 
+class VentanaEstudiante(tk.Toplevel):
+    """Ficha académica compacta, similar a la ventana de nómina."""
+    def __init__(self, parent, estudiante):
+        super().__init__(parent)
+        self.title(f"Ficha estudiante — {estudiante.nombre_completo}")
+        self.configure(bg=C["card"])
+        self.geometry("600x500")
+        self.minsize(540, 440)
+
+        programa = buscar_programa(parent.programas, estudiante.codigo_programa)
+        tk.Label(self, text=estudiante.nombre_completo, font=("Segoe UI", 14, "bold"),
+                 bg=C["card"], fg=C["primary"]).pack(anchor="w", padx=18, pady=(16, 2))
+        tk.Label(self, text=f"ID {estudiante.identificacion} · Programa: "
+                            f"{programa.nombre if programa else estudiante.codigo_programa}",
+                 font=FONT, bg=C["card"], fg=C["muted"]).pack(anchor="w", padx=18, pady=(0, 10))
+
+        promedio = estudiante.calcular_promedio()
+        riesgo = estudiante.esta_en_riesgo_ebra()
+        resumen = tk.Frame(self, bg=C["warn_bg"] if riesgo else C["ok_bg"])
+        resumen.pack(fill="x", padx=18, pady=(0, 12))
+        tk.Label(resumen, text=f"Estado: {estudiante.estado}", font=FONT_BOLD,
+                 bg=resumen["bg"], fg=C["warn_fg"] if riesgo else C["ok_fg"]).pack(side="left", padx=10, pady=8)
+        tk.Label(resumen, text=f"Promedio: {promedio:.2f}  ·  EBRA: {'EN RIESGO' if riesgo else 'Sin alerta'}",
+                 font=FONT_BOLD, bg=resumen["bg"],
+                 fg=C["warn_fg"] if riesgo else C["ok_fg"]).pack(side="right", padx=10, pady=8)
+
+        tk.Label(self, text="Cursos matriculados", font=FONT_BOLD,
+                 bg=C["card"], fg="#1a1a1a").pack(anchor="w", padx=18, pady=(2, 6))
+        frame = tk.Frame(self, bg=C["card"])
+        frame.pack(fill="both", expand=True, padx=18, pady=(0, 12))
+        tree = ttk.Treeview(frame, columns=("Código", "Curso", "Nota", "Profesor"), show="headings")
+        for col, width in (("Código", 90), ("Curso", 220), ("Nota", 70), ("Profesor", 130)):
+            tree.heading(col, text=col)
+            tree.column(col, width=width, anchor="w")
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+        for m in estudiante.matriculas:
+            curso = buscar_curso(parent.cursos, m["codigo_curso"])
+            nombre = curso.nombre if curso else "(curso no encontrado)"
+            profesor = curso.codigo_profesor if curso and curso.codigo_profesor else "—"
+            tree.insert("", "end", values=(m["codigo_curso"], nombre, f"{m['nota']:.2f}", profesor))
+
+        ttk.Button(self, text="Cerrar", command=self.destroy).pack(pady=(0, 14))
+        self.transient(parent)
+        self.grab_set()
+
+
+class VentanaProfesorResumen(tk.Toplevel):
+    def __init__(self, parent, profesor, curso=None):
+        super().__init__(parent)
+        self.title(f"Profesor — {profesor.nombre_completo}")
+        self.configure(bg=C["card"])
+        self.geometry("480x330")
+        self.resizable(False, False)
+
+        programa = buscar_programa(parent.programas, profesor.codigo_programa)
+        tk.Label(self, text=profesor.nombre_completo, font=("Segoe UI", 14, "bold"),
+                 bg=C["card"], fg=C["primary"]).pack(anchor="w", padx=18, pady=(16, 3))
+        if curso:
+            tk.Label(self, text=f"Asignado a: {curso.nombre} ({curso.codigo})", font=FONT,
+                     bg=C["card"], fg=C["muted"]).pack(anchor="w", padx=18, pady=(0, 10))
+
+        datos = [
+            ("Identificación", profesor.identificacion),
+            ("Programa", programa.nombre if programa else profesor.codigo_programa),
+            ("Vinculación", profesor.tipo_vinculacion),
+            ("Dedicación", profesor.dedicacion),
+            ("Categoría", profesor.categoria_escalafon or "Sin categoría"),
+            ("Experiencia", f"{profesor.anios_experiencia} años"),
+            ("Estado", "Activo" if profesor.activo else "Inactivo"),
+        ]
+        cuerpo = tk.Frame(self, bg=C["card"])
+        cuerpo.pack(fill="x", padx=18, pady=4)
+        for etiqueta, valor in datos:
+            f = tk.Frame(cuerpo, bg=C["card"])
+            f.pack(fill="x", pady=3)
+            tk.Label(f, text=f"{etiqueta}:", font=FONT_BOLD, bg=C["card"]).pack(side="left")
+            tk.Label(f, text=str(valor), font=FONT, bg=C["card"]).pack(side="right")
+
+        acciones = tk.Frame(self, bg=C["card"])
+        acciones.pack(pady=14)
+        ttk.Button(acciones, text="Ver nómina", command=lambda: VentanaNomina(parent, profesor)).pack(side="left", padx=5)
+        ttk.Button(acciones, text="Cerrar", command=self.destroy).pack(side="left", padx=5)
+        self.transient(parent)
+        self.grab_set()
+
+
+class VentanaCursoDetalle(tk.Toplevel):
+    def __init__(self, parent, curso):
+        super().__init__(parent)
+        self.title(f"Curso — {curso.nombre}")
+        self.configure(bg=C["card"])
+        self.geometry("650x470")
+        self.minsize(580, 420)
+
+        programa = buscar_programa(parent.programas, curso.codigo_programa)
+        profesor = buscar_profesor(parent.profesores, curso.codigo_profesor) if curso.codigo_profesor else None
+        matriculados = [e for e in parent.estudiantes
+                        if any(m["codigo_curso"] == curso.codigo for m in e.matriculas)]
+
+        tk.Label(self, text=curso.nombre, font=("Segoe UI", 14, "bold"),
+                 bg=C["card"], fg=C["primary"]).pack(anchor="w", padx=18, pady=(16, 2))
+        tk.Label(self, text=f"{curso.codigo} · {curso.creditos} créditos · "
+                            f"{programa.nombre if programa else curso.codigo_programa}",
+                 font=FONT, bg=C["card"], fg=C["muted"]).pack(anchor="w", padx=18, pady=(0, 10))
+
+        profbox = tk.Frame(self, bg="#f4f7fa", highlightbackground="#d8dde3", highlightthickness=1)
+        profbox.pack(fill="x", padx=18, pady=(0, 12))
+        tk.Label(profbox, text="Profesor asignado", font=FONT_BOLD,
+                 bg="#f4f7fa", fg=C["primary"]).pack(anchor="w", padx=10, pady=(8, 2))
+        texto_prof = profesor.nombre_completo if profesor else "Sin profesor asignado"
+        tk.Label(profbox, text=texto_prof, font=FONT, bg="#f4f7fa", fg="#1a1a1a").pack(anchor="w", padx=10)
+        if profesor:
+            ttk.Button(profbox, text="Ver profesor", command=lambda: VentanaProfesorResumen(parent, profesor, curso)).pack(anchor="e", padx=10, pady=(4, 8))
+        else:
+            tk.Frame(profbox, bg="#f4f7fa", height=8).pack()
+
+        tk.Label(self, text=f"Estudiantes matriculados ({len(matriculados)})", font=FONT_BOLD,
+                 bg=C["card"], fg="#1a1a1a").pack(anchor="w", padx=18, pady=(2, 6))
+        frame = tk.Frame(self, bg=C["card"])
+        frame.pack(fill="both", expand=True, padx=18, pady=(0, 10))
+        tree = ttk.Treeview(frame, columns=("ID", "Nombre", "Programa", "Nota"), show="headings")
+        for col, width in (("ID", 110), ("Nombre", 260), ("Programa", 90), ("Nota", 70)):
+            tree.heading(col, text=col)
+            tree.column(col, width=width, anchor="w")
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+        for e in matriculados:
+            nota = next((m["nota"] for m in e.matriculas if m["codigo_curso"] == curso.codigo), 0.0)
+            tree.insert("", "end", iid=e.identificacion,
+                        values=(e.identificacion, e.nombre_completo, e.codigo_programa, f"{nota:.2f}"))
+
+        def ver_estudiante(event=None):
+            sel = tree.selection()
+            if sel:
+                est = buscar_estudiante(parent.estudiantes, sel[0])
+                if est:
+                    VentanaEstudiante(parent, est)
+        tree.bind("<Double-1>", ver_estudiante)
+
+        ttk.Button(self, text="Cerrar", command=self.destroy).pack(pady=(0, 14))
+        self.transient(parent)
+        self.grab_set()
+
+
 class VentanaNomina(tk.Toplevel):
-    """Muestra el desglose de nomina de un profesor, reutilizando nomina.py."""
+    """Desglose de nómina distinguiendo el régimen real de vinculación."""
     def __init__(self, parent, profesor):
         super().__init__(parent)
         self.title(f"Nómina — {profesor.nombre_completo}")
         self.configure(bg=C["card"])
         self.resizable(False, False)
-        self.geometry("420x480")
+        self.geometry("540x590")
 
         tk.Label(self, text=profesor.nombre_completo, font=("Segoe UI", 14, "bold"),
                  bg=C["card"], fg=C["primary"]).pack(anchor="w", padx=18, pady=(16, 2))
         tk.Label(self, text=f"{profesor.tipo_vinculacion} · {profesor.dedicacion}",
-                 font=FONT, bg=C["card"], fg=C["muted"]).pack(anchor="w", padx=18, pady=(0, 12))
+                 font=FONT, bg=C["card"], fg=C["muted"]).pack(anchor="w", padx=18)
+        tk.Label(self, text=f"Régimen: {regimen_nomina(profesor)}",
+                 font=("Segoe UI", 9, "italic"), bg=C["card"], fg=C["muted"]).pack(
+                     anchor="w", padx=18, pady=(2, 12))
 
         filas = tk.Frame(self, bg=C["card"])
         filas.pack(fill="x", padx=18)
@@ -1148,59 +1392,83 @@ class VentanaNomina(tk.Toplevel):
             tk.Label(f, text=valor, font=FONT_BOLD if bold else FONT, bg=C["card"],
                      fg=color or "#1a1a1a").pack(side="right")
 
-        puntos_cat = puntos_por_categoria(profesor.categoria_escalafon)
-        puntos_total = total_puntos(profesor)
-        factor = factor_proporcionalidad(profesor)
         bruto = calcular_salario_bruto(profesor)
-        salud = calcular_descuento_salud(bruto)
-        pension = calcular_descuento_pension(bruto)
-        neto = calcular_salario_neto(profesor)
-        prima = calcular_prima_servicios(bruto)
-        cesantias = calcular_cesantias(bruto)
+        disponible = liquidacion_disponible(profesor)
 
-        fila("Categoría escalafón:", f"{profesor.categoria_escalafon or '—'} ({puntos_cat} pts)")
-        fila("Puntos por títulos:", str(profesor.puntos_titulos))
-        fila("Puntos por productividad:", str(profesor.puntos_productividad))
-        fila("Total de puntos:", str(puntos_total), bold=True)
-        fila("Valor del punto:", f"${VALOR_PUNTO:,.2f}")
-        fila("Factor proporcional:", f"{factor:.2f}")
+        if profesor.tipo_vinculacion == "Planta":
+            puntos_cat = puntos_por_categoria(profesor.categoria_escalafon)
+            fila("Puntos título profesional:", str(PUNTOS_PREGRADO))
+            fila("Categoría escalafón:", f"{profesor.categoria_escalafon or '—'} ({puntos_cat} pts)")
+            fila("Puntos títulos adicionales:", str(profesor.puntos_titulos))
+            fila("Puntos productividad:", str(profesor.puntos_productividad))
+            fila("Total usado por PITA:", str(total_puntos(profesor)), bold=True)
+            fila("Valor del punto 2026:", f"${VALOR_PUNTO:,.0f}")
+            fila("Factor dedicación:", f"{factor_proporcionalidad(profesor):.2f}")
+        elif profesor.tipo_vinculacion == "Ocasional":
+            factor = factor_ocasional(profesor)
+            fila("Categoría:", profesor.categoria_escalafon or "—")
+            fila("Dedicación:", profesor.dedicacion)
+            fila("Factor Acuerdo 027:", f"{factor:.3f} SMMLV" if factor is not None else "No definido")
+            fila("SMMLV 2026:", f"${SMMLV:,.0f}")
+            fila("Bonif. posgrado/investigación:", "No calculadas")
+        elif profesor.tipo_vinculacion == "Catedratico":
+            fila("Horas cátedra semanales:", str(profesor.horas_catedra_semanales))
+            fila("Límite reglamentario:", "Hasta 18 h/semana")
+            fila("Valor hora rectoral 2026:",
+                 f"${VALOR_HORA_CATEDRA:,.0f}" if VALOR_HORA_CATEDRA is not None else "No configurado")
+            fila("Liquidación:", "Pendiente resolución rectoral" if not disponible else "Disponible")
+        else:
+            fila("Régimen:", "No definido")
 
         tk.Frame(self, bg="#d8dde3", height=1).pack(fill="x", padx=18, pady=10)
 
-        filas2 = tk.Frame(self, bg=C["card"])
-        filas2.pack(fill="x", padx=18)
+        if disponible:
+            salud = calcular_descuento_salud(bruto)
+            pension = calcular_descuento_pension(bruto)
+            neto = calcular_salario_neto(profesor)
+            filas2 = tk.Frame(self, bg=C["card"])
+            filas2.pack(fill="x", padx=18)
 
-        def fila2(label, valor, bold=False, color=None):
-            f = tk.Frame(filas2, bg=C["card"])
-            f.pack(fill="x", pady=3)
-            tk.Label(f, text=label, font=FONT_BOLD if bold else FONT, bg=C["card"],
-                     fg=color or "#1a1a1a").pack(side="left")
-            tk.Label(f, text=valor, font=FONT_BOLD if bold else FONT, bg=C["card"],
-                     fg=color or "#1a1a1a").pack(side="right")
+            def fila2(label, valor, bold=False):
+                f = tk.Frame(filas2, bg=C["card"])
+                f.pack(fill="x", pady=3)
+                tk.Label(f, text=label, font=FONT_BOLD if bold else FONT, bg=C["card"]).pack(side="left")
+                tk.Label(f, text=valor, font=FONT_BOLD if bold else FONT, bg=C["card"]).pack(side="right")
 
-        fila2("Salario bruto:", f"${bruto:,.2f}", bold=True)
-        fila2("(-) Salud (4%):", f"${salud:,.2f}")
-        fila2("(-) Pensión (4%):", f"${pension:,.2f}")
+            fila2("Salario bruto:", f"${bruto:,.2f}", bold=True)
+            fila2("(-) Salud (4%):", f"${salud:,.2f}")
+            fila2("(-) Pensión (4%):", f"${pension:,.2f}")
 
-        neto_frame = tk.Frame(self, bg=C["ok_bg"] if neto > 0 else C["warn_bg"])
-        neto_frame.pack(fill="x", padx=18, pady=12)
-        tk.Label(neto_frame, text="SALARIO NETO", font=FONT_BOLD, bg=neto_frame["bg"],
-                 fg=C["ok_fg"] if neto > 0 else C["warn_fg"]).pack(side="left", padx=10, pady=8)
-        tk.Label(neto_frame, text=f"${neto:,.2f}", font=("Segoe UI", 13, "bold"), bg=neto_frame["bg"],
-                 fg=C["ok_fg"] if neto > 0 else C["warn_fg"]).pack(side="right", padx=10, pady=8)
+            neto_frame = tk.Frame(self, bg=C["ok_bg"] if neto > 0 else C["warn_bg"])
+            neto_frame.pack(fill="x", padx=18, pady=12)
+            tk.Label(neto_frame, text="SALARIO NETO ESTIMADO", font=FONT_BOLD,
+                     bg=neto_frame["bg"], fg=C["ok_fg"] if neto > 0 else C["warn_fg"]).pack(
+                         side="left", padx=10, pady=8)
+            tk.Label(neto_frame, text=f"${neto:,.2f}", font=("Segoe UI", 13, "bold"),
+                     bg=neto_frame["bg"], fg=C["ok_fg"] if neto > 0 else C["warn_fg"]).pack(
+                         side="right", padx=10, pady=8)
 
-        if profesor.ad_honorem:
-            tk.Label(self, text="Vinculación ad-honorem: sin remuneración por normativa.",
-                     font=("Segoe UI", 9, "italic"), bg=C["card"], fg=C["muted"]).pack(padx=18)
+            if profesor.tipo_vinculacion == "Planta":
+                prima = calcular_prima_servicios(bruto)
+                cesantias = calcular_cesantias(bruto)
+                tk.Label(self, text=f"Provisión mensual prima de servicios: ${prima:,.2f}",
+                         font=("Segoe UI", 9), bg=C["card"], fg=C["muted"]).pack(anchor="w", padx=18)
+                tk.Label(self, text=f"Provisión mensual cesantías: ${cesantias:,.2f}",
+                         font=("Segoe UI", 9), bg=C["card"], fg=C["muted"]).pack(anchor="w", padx=18)
+        else:
+            aviso = tk.Frame(self, bg=C["warn_bg"])
+            aviso.pack(fill="x", padx=18, pady=8)
+            tk.Label(aviso, text="NO SE LIQUIDA UN SALARIO INVENTADO",
+                     font=FONT_BOLD, bg=C["warn_bg"], fg=C["warn_fg"]).pack(padx=10, pady=(8, 2))
+            tk.Label(aviso, text="Falta el valor de hora cátedra fijado por resolución rectoral vigente.",
+                     font=("Segoe UI", 9), bg=C["warn_bg"], fg=C["warn_fg"], wraplength=470).pack(
+                         padx=10, pady=(0, 8))
 
-        filas3 = tk.Frame(self, bg=C["card"])
-        filas3.pack(fill="x", padx=18, pady=(6, 16))
-        tk.Label(filas3, text=f"Prima (informativo): ${prima:,.2f}", font=("Segoe UI", 9),
-                 bg=C["card"], fg=C["muted"]).pack(anchor="w")
-        tk.Label(filas3, text=f"Cesantías (informativo): ${cesantias:,.2f}", font=("Segoe UI", 9),
-                 bg=C["card"], fg=C["muted"]).pack(anchor="w")
+        obs = observacion_normativa(profesor)
+        tk.Label(self, text=obs, font=("Segoe UI", 9, "italic"), bg=C["card"], fg=C["muted"],
+                 wraplength=495, justify="left").pack(fill="x", padx=18, pady=(12, 8))
 
-        ttk.Button(self, text="Cerrar", command=self.destroy).pack(pady=(0, 14))
+        ttk.Button(self, text="Cerrar", command=self.destroy).pack(pady=(4, 14))
         self.transient(parent)
         self.grab_set()
 
