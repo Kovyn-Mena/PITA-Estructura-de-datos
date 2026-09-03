@@ -44,12 +44,13 @@ bool estaEnRiesgoEbra(const Estudiante& e); // promedio < 3.25
 void consultarEstudiante(std::vector<Estudiante>& estudiantes, const std::string& id);
 
 // ===================== PROFESORES =====================
-void crearProfesor(std::vector<Profesor>& profesores);
+void crearProfesor(std::vector<Profesor>& profesores, std::vector<Programa>& programas);
 void listarProfesores(const std::vector<Profesor>& profesores);
 Profesor* buscarProfesor(std::vector<Profesor>& profesores, const std::string& id);
 void modificarProfesor(std::vector<Profesor>& profesores, const std::string& id);
 void desactivarProfesor(std::vector<Profesor>& profesores, const std::string& id);
 void eliminarProfesor(std::vector<Profesor>& profesores, const std::string& id);
+void consultarProfesor(std::vector<Profesor>& profesores, const std::string& id); // desglose de nomina
 
 // ===================== ADMINISTRATIVOS =====================
 void crearAdministrativo(std::vector<Administrativo>& admins);

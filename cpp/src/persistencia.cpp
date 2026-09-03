@@ -214,6 +214,55 @@ vector<Estudiante> cargarEstudiantes(const string& rutaEst, const string& rutaMa
 }
 
 // =========================================================================
-// TODO: implementar guardar/cargar para Profesor y Administrativo,
-// siguiendo el mismo patron.
+// PROFESORES
+// =========================================================================
+
+void guardarProfesores(const vector<Profesor>& v, const string& ruta) {
+    ofstream archivo(ruta);
+    if (!archivo.is_open()) {
+        cout << "No se pudo abrir " << ruta << " para escritura.\n";
+        return;
+    }
+    for (const auto& p : v) {
+        archivo << p.identificacion << "|" << p.nombreCompleto << "|"
+                << p.codigoPrograma << "|" << p.tipoVinculacion << "|"
+                << p.dedicacion << "|" << p.categoriaEscalafon << "|"
+                << p.horasCatedraSemanales << "|" << (p.adHonorem ? 1 : 0) << "|"
+                << p.aniosExperiencia << "|" << p.puntosTitulos << "|"
+                << p.puntosProductividad << "|" << (p.activo ? 1 : 0) << "\n";
+    }
+    archivo.close();
+}
+
+vector<Profesor> cargarProfesores(const string& ruta) {
+    vector<Profesor> resultado;
+    ifstream archivo(ruta);
+    if (!archivo.is_open()) return resultado;
+
+    string linea;
+    while (getline(archivo, linea)) {
+        if (linea.empty()) continue;
+        vector<string> campos = split(linea, '|');
+        if (campos.size() < 12) continue;
+        Profesor p;
+        p.identificacion = campos[0];
+        p.nombreCompleto = campos[1];
+        p.codigoPrograma = campos[2];
+        p.tipoVinculacion = campos[3];
+        p.dedicacion = campos[4];
+        p.categoriaEscalafon = campos[5];
+        p.horasCatedraSemanales = stoi(campos[6]);
+        p.adHonorem = (campos[7] == "1");
+        p.aniosExperiencia = stoi(campos[8]);
+        p.puntosTitulos = stoi(campos[9]);
+        p.puntosProductividad = stoi(campos[10]);
+        p.activo = (campos[11] == "1");
+        resultado.push_back(p);
+    }
+    archivo.close();
+    return resultado;
+}
+
+// =========================================================================
+// TODO: implementar guardar/cargar para Administrativo, siguiendo el mismo patron.
 // =========================================================================

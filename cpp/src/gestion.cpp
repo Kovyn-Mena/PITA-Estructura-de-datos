@@ -1,5 +1,6 @@
 #include "../include/gestion.h"
 #include "../include/interfaz.h"
+#include "../include/nomina.h"
 #include <iostream>
 #include <limits>
 
@@ -408,7 +409,10 @@ float calcularPromedio(const Estudiante& e) {
 }
 
 bool estaEnRiesgoEbra(const Estudiante& e) {
-    // EBRA: riesgo de desercion academica, promedio por debajo de 3.25
+    // EBRA: riesgo de desercion academica, promedio por debajo de 3.25.
+    // Un estudiante SIN matriculas aun no tiene base para evaluarse,
+    // asi que no se marca en riesgo (evita falsos positivos).
+    if (e.matriculas.empty()) return false;
     return calcularPromedio(e) < 3.25f;
 }
 
@@ -436,7 +440,158 @@ void consultarEstudiante(vector<Estudiante>& estudiantes, const string& id) {
 }
 
 // =========================================================================
-// PROFESORES, ADMINISTRATIVOS
+// PROFESORES — el campo tipoVinculacion/dedicacion/categoriaEscalafon se
+// pide por MENU numerado (no texto libre), porque nomina.cpp compara estos
+// valores con strings exactos ("Planta", "Asociado", etc.): un error de
+// tedeo aqui daria un salario silenciosamente incorrecto. Con menu, eso
+// no puede pasar.
+// =========================================================================
+
+static string seleccionarTipoVinculacion() {
+    cout << "Tipo de vinculacion:\n  1. Planta\n  2. Ocasional\n  3. Catedratico\n";
+    int op = leerOpcionInmediata("Opcion: ");
+    if (op == 1) return "Planta";
+    if (op == 2) return "Ocasional";
+    return "Catedratico"; // cualquier otra tecla cae aqui como valor por defecto seguro
+}
+
+static string seleccionarDedicacion() {
+    cout << "Dedicacion:\n  1. Tiempo completo\n  2. Medio tiempo\n";
+    int op = leerOpcionInmediata("Opcion: ");
+    return (op == 2) ? "MedioTiempo" : "TiempoCompleto";
+}
+
+static string seleccionarCategoriaEscalafon() {
+    cout << "Categoria del escalafon:\n  1. Auxiliar\n  2. Asistente\n  3. Asociado\n  4. Titular\n";
+    int op = leerOpcionInmediata("Opcion: ");
+    switch (op) {
+        case 1: return "Auxiliar";
+        case 2: return "Asistente";
+        case 3: return "Asociado";
+        case 4: return "Titular";
+        default: return "Auxiliar";
+    }
+}
+
+void crearProfesor(vector<Profesor>& profesores, vector<Programa>& programas) {
+    Profesor p;
+    p.identificacion = leerPalabra("Identificacion (o 'cancelar' para volver): ");
+    if (esCancelar(p.identificacion)) { cout << "Operacion cancelada.\n"; return; }
+
+    if (buscarProfesor(profesores, p.identificacion) != nullptr) {
+        cout << "Ya existe un profesor con esa identificacion.\n";
+        return;
+    }
+
+    p.codigoPrograma = leerPalabra("Codigo del programa al que pertenece: ");
+    if (esCancelar(p.codigoPrograma)) { cout << "Operacion cancelada.\n"; return; }
+
+    Programa* prog = buscarPrograma(programas, p.codigoPrograma);
+    if (!prog) {
+        cout << "Ese programa no existe. Cree primero el programa.\n";
+        return;
+    }
+
+    cout << "Nombre completo: ";
+    getline(cin, p.nombreCompleto);
+
+    p.tipoVinculacion = seleccionarTipoVinculacion();
+
+    if (p.tipoVinculacion == "Catedratico") {
+        // Segun el Acuerdo 027/2024: catedra, maximo 18 horas semanales.
+        do {
+            cout << "Horas catedra semanales (maximo 18): ";
+            p.horasCatedraSemanales = leerEntero();
+            if (p.horasCatedraSemanales > 18) {
+                cout << "El Acuerdo 027/2024 permite maximo 18 horas semanales. Intente de nuevo.\n";
+            }
+        } while (p.horasCatedraSemanales > 18 || p.horasCatedraSemanales <= 0);
+        p.dedicacion = "HorasCatedra";
+        p.categoriaEscalafon = ""; // los catedraticos no tienen escalafon formal en este modelo
+        p.adHonorem = (leerSiNo("Es vinculacion ad-honorem, sin remuneracion? (s/n): ") == 's');
+    } else {
+        p.dedicacion = seleccionarDedicacion();
+        p.categoriaEscalafon = seleccionarCategoriaEscalafon();
+        p.horasCatedraSemanales = 0;
+        p.adHonorem = false;
+    }
+
+    cout << "Anios de experiencia: ";
+    p.aniosExperiencia = leerEntero();
+    cout << "Puntos por titulos academicos: ";
+    p.puntosTitulos = leerEntero();
+    cout << "Puntos por productividad academica: ";
+    p.puntosProductividad = leerEntero();
+    p.activo = true;
+
+    profesores.push_back(p);
+    cout << "Profesor creado correctamente.\n";
+}
+
+void listarProfesores(const vector<Profesor>& profesores) {
+    cout << "\n--- Profesores registrados ---\n";
+    if (profesores.empty()) {
+        cout << "(no hay profesores registrados)\n";
+        return;
+    }
+    for (const auto& p : profesores) {
+        cout << p.identificacion << " | " << p.nombreCompleto
+             << " | Programa: " << p.codigoPrograma
+             << " | " << p.tipoVinculacion << " (" << p.dedicacion << ")";
+        if (!p.categoriaEscalafon.empty()) cout << " | Categoria: " << p.categoriaEscalafon;
+        if (p.adHonorem) cout << " | AD-HONOREM";
+        cout << " | " << (p.activo ? "Activo" : "Inactivo") << "\n";
+    }
+}
+
+Profesor* buscarProfesor(vector<Profesor>& profesores, const string& id) {
+    for (auto& p : profesores) {
+        if (p.identificacion == id) return &p;
+    }
+    return nullptr;
+}
+
+void modificarProfesor(vector<Profesor>& profesores, const string& id) {
+    Profesor* p = buscarProfesor(profesores, id);
+    if (!p) { cout << "Profesor no encontrado.\n"; return; }
+
+    cout << "Nuevo nombre (" << p->nombreCompleto << "): ";
+    getline(cin, p->nombreCompleto);
+    cout << "Nuevos anios de experiencia (" << p->aniosExperiencia << "): ";
+    p->aniosExperiencia = leerEntero();
+    cout << "Nuevos puntos por titulos (" << p->puntosTitulos << "): ";
+    p->puntosTitulos = leerEntero();
+    cout << "Nuevos puntos por productividad (" << p->puntosProductividad << "): ";
+    p->puntosProductividad = leerEntero();
+    cout << "Profesor modificado.\n";
+}
+
+void desactivarProfesor(vector<Profesor>& profesores, const string& id) {
+    Profesor* p = buscarProfesor(profesores, id);
+    if (!p) { cout << "Profesor no encontrado.\n"; return; }
+    p->activo = false;
+    cout << "Profesor desactivado (borrado logico).\n";
+}
+
+void eliminarProfesor(vector<Profesor>& profesores, const string& id) {
+    for (size_t i = 0; i < profesores.size(); i++) {
+        if (profesores[i].identificacion == id) {
+            profesores.erase(profesores.begin() + i);
+            cout << "Profesor eliminado permanentemente.\n";
+            return;
+        }
+    }
+    cout << "Profesor no encontrado.\n";
+}
+
+void consultarProfesor(vector<Profesor>& profesores, const string& id) {
+    Profesor* p = buscarProfesor(profesores, id);
+    if (!p) { cout << "Profesor no encontrado.\n"; return; }
+    imprimirDesgloseNomina(*p); // definida en nomina.cpp
+}
+
+// =========================================================================
+// ADMINISTRATIVOS
 // TODO: replicar el mismo patron (siguiente bloque).
 // Los prototipos ya estan declarados en gestion.h.
 // =========================================================================
