@@ -149,11 +149,15 @@ class PitaApp(tk.Tk):
         self.estudiantes = []
         self.profesores = []
         self.administrativos = []
+        self.notebook = None
+        self.pantalla_inicio = None
 
         self._configurar_estilo()
         self._construir_header()
-        self._construir_notebook()
+        # Los datos se cargan antes de mostrar el menú para que la pantalla
+        # de entrada pueda presentar un resumen real del sistema.
         self._cargar_datos(silencioso=True)
+        self._construir_pantalla_inicio()
 
         self.protocol("WM_DELETE_WINDOW", self._salir)
 
@@ -186,25 +190,90 @@ class PitaApp(tk.Tk):
         style.map("Danger.TButton", background=[("active", C["danger_dark"])])
 
     def _construir_header(self):
-        header = tk.Frame(self, bg=C["primary"], height=66)
+        # Un poco más de altura evita que los botones superiores queden
+        # recortados en Windows y deja respirar mejor al encabezado.
+        header = tk.Frame(self, bg=C["primary"], height=82)
         header.pack(fill="x", side="top")
         header.pack_propagate(False)
 
         left = tk.Frame(header, bg=C["primary"])
-        left.pack(side="left", padx=20)
+        left.pack(side="left", padx=20, pady=10)
         tk.Label(left, text="PITA", font=FONT_TITLE, bg=C["primary"], fg="white").pack(anchor="w")
         tk.Label(left, text="Programa Integrado de Transacciones Académicas — UPC",
                  font=FONT_SUB, bg=C["primary"], fg="#c9d9e8").pack(anchor="w")
 
-        right = tk.Frame(header, bg=C["primary"])
-        right.pack(side="right", padx=16)
-        ttk.Button(right, text="Recargar datos", command=self._recargar_datos).pack(side="left", padx=4, pady=18)
-        ttk.Button(right, text="Guardar datos", style="Accent.TButton", command=self._guardar_datos).pack(
-            side="left", padx=4, pady=18)
+        self.header_actions = tk.Frame(header, bg=C["primary"])
+        # Estos botones solo aparecen al entrar al sistema; así la portada
+        # queda limpia y el menú no aparece de golpe al iniciar.
+        ttk.Button(self.header_actions, text="Recargar datos", width=15,
+                   command=self._recargar_datos).pack(side="left", padx=4, pady=18)
+        ttk.Button(self.header_actions, text="Guardar datos", width=15,
+                   style="Accent.TButton", command=self._guardar_datos).pack(side="left", padx=4, pady=18)
 
         self.status_var = tk.StringVar(value="")
         tk.Label(self, textvariable=self.status_var, font=("Segoe UI", 9, "italic"),
                  bg=C["bg"], fg=C["muted"], anchor="w").pack(fill="x", padx=16, pady=(6, 0))
+
+    def _construir_pantalla_inicio(self):
+        """Pantalla de bienvenida que aparece antes de las pestañas de gestión."""
+        self.pantalla_inicio = tk.Frame(self, bg=C["bg"])
+        self.pantalla_inicio.pack(fill="both", expand=True, padx=18, pady=18)
+
+        card = tk.Frame(self.pantalla_inicio, bg=C["card"],
+                        highlightbackground="#d8dde3", highlightthickness=1)
+        card.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.72, relheight=0.72)
+
+        tk.Label(card, text="Bienvenido a PITA", font=("Segoe UI", 24, "bold"),
+                 bg=C["card"], fg=C["primary"]).pack(pady=(34, 6))
+        tk.Label(card, text="Programa Integrado de Transacciones Académicas",
+                 font=("Segoe UI", 12), bg=C["card"], fg=C["muted"]).pack()
+        tk.Label(card, text="Universidad Popular del Cesar", font=("Segoe UI", 11, "bold"),
+                 bg=C["card"], fg="#374151").pack(pady=(3, 24))
+
+        stats = tk.Frame(card, bg="#f4f7fa")
+        stats.pack(fill="x", padx=42, pady=(0, 24))
+        resumen = [
+            ("Facultades", len(self.facultades)),
+            ("Programas", len(self.programas)),
+            ("Cursos", len(self.cursos)),
+            ("Estudiantes", len(self.estudiantes)),
+            ("Profesores", len(self.profesores)),
+            ("Administrativos", len(self.administrativos)),
+        ]
+        for i, (nombre, cantidad) in enumerate(resumen):
+            celda = tk.Frame(stats, bg="#f4f7fa")
+            celda.grid(row=0, column=i, padx=8, pady=14)
+            tk.Label(celda, text=str(cantidad), font=("Segoe UI", 16, "bold"),
+                     bg="#f4f7fa", fg=C["primary"]).pack()
+            tk.Label(celda, text=nombre, font=("Segoe UI", 8),
+                     bg="#f4f7fa", fg=C["muted"]).pack()
+        for i in range(len(resumen)):
+            stats.grid_columnconfigure(i, weight=1)
+
+        tk.Label(card, text="Selecciona entrar para acceder a los módulos de gestión.",
+                 font=FONT, bg=C["card"], fg="#4b5563").pack(pady=(0, 14))
+        ttk.Button(card, text="Entrar al sistema", width=22, style="Accent.TButton",
+                   command=self._entrar_sistema).pack(ipady=3)
+        ttk.Button(card, text="Salir", command=self._salir).pack(pady=(10, 0))
+
+        self._set_status(
+            f"Datos cargados: {len(self.facultades)} facultades, {len(self.programas)} programas, "
+            f"{len(self.cursos)} cursos, {len(self.estudiantes)} estudiantes, "
+            f"{len(self.profesores)} profesores, {len(self.administrativos)} administrativos."
+        )
+
+    def _entrar_sistema(self):
+        """Oculta la bienvenida y muestra el menú completo de gestión."""
+        if self.pantalla_inicio is not None:
+            self.pantalla_inicio.destroy()
+            self.pantalla_inicio = None
+        self.header_actions.pack(side="right", padx=16)
+        self._construir_notebook()
+        self._set_status(
+            f"Sistema listo: {len(self.facultades)} facultades, {len(self.programas)} programas, "
+            f"{len(self.cursos)} cursos, {len(self.estudiantes)} estudiantes, "
+            f"{len(self.profesores)} profesores, {len(self.administrativos)} administrativos."
+        )
 
     def _set_status(self, texto):
         self.status_var.set(texto)
@@ -212,6 +281,8 @@ class PitaApp(tk.Tk):
     # ---------------- Notebook (pestañas) ----------------
 
     def _construir_notebook(self):
+        if self.notebook is not None:
+            return
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True, padx=14, pady=12)
 
