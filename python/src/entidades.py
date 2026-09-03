@@ -50,6 +50,10 @@ class Estudiante:
         return sum(notas) / len(notas)
 
     def esta_en_riesgo_ebra(self, umbral=3.25):
+        # Sin matriculas aun no hay base para evaluar el riesgo
+        # (evita una falsa alarma para un estudiante recien creado).
+        if not self.matriculas:
+            return False
         return self.calcular_promedio() < umbral
 
 
@@ -75,11 +79,12 @@ class Profesor:
 
 class Administrativo:
     def __init__(self, identificacion, nombre_completo, cargo, categoria,
-                 tipo_contratacion, salario_base, activo=True):
+                 tipo_contratacion, salario_base, codigo_facultad="", activo=True):
         self.identificacion = identificacion
         self.nombre_completo = nombre_completo
         self.cargo = cargo
         self.categoria = categoria
         self.tipo_contratacion = tipo_contratacion
         self.salario_base = salario_base
+        self.codigo_facultad = codigo_facultad  # vacio = nivel central (ej. Rectoria)
         self.activo = activo

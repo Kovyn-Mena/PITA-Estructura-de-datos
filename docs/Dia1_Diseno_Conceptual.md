@@ -172,7 +172,7 @@ Para Facultad, Programa, Curso, Estudiante, Profesor y Administrativo, todas deb
 - **Python:** clases simples con listas/diccionarios.
 - **Persistencia:** archivo de texto plano (más simple de depurar y de explicar en el video) para la primera versión; se puede migrar a binario si sobra tiempo.
 - **EBRA:** promedio_acumulado < 3.25 → alerta automática al consultar o actualizar el estudiante.
-- **Interfaz de consola:** cada menú limpia la pantalla antes de dibujarse (`system("cls")`/`system("clear")` según el sistema operativo) y hace una pausa ("Presione ENTER para continuar") después de cada acción, para no perder información en pantalla pero mantenerla ordenada. Las confirmaciones tipo s/n se leen con una sola tecla, sin esperar ENTER, usando `conio.h` en Windows y `termios.h` en Linux/Mac. Ver `cpp/include/interfaz.h`.
+- **Interfaz de consola:** cada menú limpia la pantalla antes de dibujarse (`system("cls")`/`system("clear")` según el sistema operativo) y hace una pausa ("Presione ENTER para continuar") después de cada acción, para no perder información en pantalla pero mantenerla ordenada. Las confirmaciones tipo s/n se leen con una sola tecla, sin esperar ENTER, usando `conio.h` en Windows y `termios.h` en Linux/Mac. Ver `cpp/include/interfaz.h`. La versión Python replica exactamente el mismo comportamiento con `msvcrt` (Windows) / `termios`+`tty` (Linux/Mac), con respaldo automático a lectura de línea normal si no hay una terminal interactiva real disponible. Ver `python/src/interfaz.py`.
 
 ---
 
