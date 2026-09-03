@@ -221,17 +221,19 @@ class PitaApp(tk.Tk):
 
         card = tk.Frame(self.pantalla_inicio, bg=C["card"],
                         highlightbackground="#d8dde3", highlightthickness=1)
-        card.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.72, relheight=0.72)
+        card.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.78, relheight=0.78)
 
         tk.Label(card, text="Bienvenido a PITA", font=("Segoe UI", 24, "bold"),
-                 bg=C["card"], fg=C["primary"]).pack(pady=(34, 6))
+                 bg=C["card"], fg=C["primary"]).pack(pady=(28, 5))
         tk.Label(card, text="Programa Integrado de Transacciones Académicas",
                  font=("Segoe UI", 12), bg=C["card"], fg=C["muted"]).pack()
         tk.Label(card, text="Universidad Popular del Cesar", font=("Segoe UI", 11, "bold"),
-                 bg=C["card"], fg="#374151").pack(pady=(3, 24))
+                 bg=C["card"], fg="#374151").pack(pady=(3, 18))
 
-        stats = tk.Frame(card, bg="#f4f7fa")
-        stats.pack(fill="x", padx=42, pady=(0, 24))
+        # Tarjetas en 2 filas de 3: se leen mejor y no se comprimen cuando
+        # la ventana se ejecuta en resoluciones pequeñas de Windows.
+        stats = tk.Frame(card, bg="#f4f7fa", highlightbackground="#e1e6eb", highlightthickness=1)
+        stats.pack(fill="x", padx=42, pady=(0, 20))
         resumen = [
             ("Facultades", len(self.facultades)),
             ("Programas", len(self.programas)),
@@ -241,20 +243,36 @@ class PitaApp(tk.Tk):
             ("Administrativos", len(self.administrativos)),
         ]
         for i, (nombre, cantidad) in enumerate(resumen):
+            fila, columna = divmod(i, 3)
             celda = tk.Frame(stats, bg="#f4f7fa")
-            celda.grid(row=0, column=i, padx=8, pady=14)
-            tk.Label(celda, text=str(cantidad), font=("Segoe UI", 16, "bold"),
+            celda.grid(row=fila, column=columna, padx=10, pady=8, sticky="nsew")
+            tk.Label(celda, text=str(cantidad), font=("Segoe UI", 17, "bold"),
                      bg="#f4f7fa", fg=C["primary"]).pack()
-            tk.Label(celda, text=nombre, font=("Segoe UI", 8),
+            tk.Label(celda, text=nombre, font=("Segoe UI", 9),
                      bg="#f4f7fa", fg=C["muted"]).pack()
-        for i in range(len(resumen)):
+        for i in range(3):
             stats.grid_columnconfigure(i, weight=1)
 
-        tk.Label(card, text="Selecciona entrar para acceder a los módulos de gestión.",
-                 font=FONT, bg=C["card"], fg="#4b5563").pack(pady=(0, 14))
-        ttk.Button(card, text="Entrar al sistema", width=22, style="Accent.TButton",
-                   command=self._entrar_sistema).pack(ipady=3)
-        ttk.Button(card, text="Salir", command=self._salir).pack(pady=(10, 0))
+        tk.Label(card, text="Selecciona una opción para continuar.",
+                 font=FONT, bg=C["card"], fg="#4b5563").pack(pady=(0, 12))
+
+        # Se usan botones tk.Button con dimensiones explícitas para evitar el
+        # problema de ttk en algunas configuraciones de Windows donde "Salir"
+        # terminaba renderizándose como puntos o quedaba comprimido.
+        acciones = tk.Frame(card, bg=C["card"])
+        acciones.pack(pady=(0, 4))
+
+        tk.Button(acciones, text="Entrar al sistema", command=self._entrar_sistema,
+                  font=("Segoe UI", 10, "bold"), width=24, height=1,
+                  bg=C["primary"], fg="white", activebackground=C["primary_dark"],
+                  activeforeground="white", relief="flat", cursor="hand2",
+                  padx=8, pady=7).pack(pady=(0, 8))
+
+        tk.Button(acciones, text="Salir", command=self._salir,
+                  font=("Segoe UI", 10, "bold"), width=24, height=1,
+                  bg="#e5e7eb", fg="#374151", activebackground="#d1d5db",
+                  activeforeground="#111827", relief="flat", cursor="hand2",
+                  padx=8, pady=7).pack()
 
         self._set_status(
             f"Datos cargados: {len(self.facultades)} facultades, {len(self.programas)} programas, "
