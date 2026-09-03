@@ -16,6 +16,8 @@ Este es el equivalente en Python de cpp/src/main.cpp -- mismas decisiones
 de diseno, mismo comportamiento para el usuario, mismo formato de datos.
 """
 
+import os
+
 from gestion import (
     crear_facultad, listar_facultades, modificar_facultad,
     desactivar_facultad, eliminar_facultad, buscar_facultad,
@@ -41,13 +43,19 @@ from persistencia import (
 )
 from interfaz import limpiar_pantalla, pausar, leer_opcion_inmediata, leer_si_no
 
-RUTA_FACULTADES = "../data/facultades.txt"
-RUTA_PROGRAMAS = "../data/programas.txt"
-RUTA_CURSOS = "../data/cursos.txt"
-RUTA_ESTUDIANTES = "../data/estudiantes.txt"
-RUTA_MATRICULAS = "../data/matriculas.txt"
-RUTA_PROFESORES = "../data/profesores.txt"
-RUTA_ADMINISTRATIVOS = "../data/administrativos.txt"
+# Rutas ABSOLUTAS calculadas a partir de la ubicacion de este archivo, para
+# que el programa funcione sin importar desde que carpeta se ejecute
+# (ej. python3 python/src/main.py desde la raiz del proyecto tambien funciona).
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_DATA_DIR = os.path.join(_BASE_DIR, "..", "data")
+
+RUTA_FACULTADES = os.path.join(_DATA_DIR, "facultades.txt")
+RUTA_PROGRAMAS = os.path.join(_DATA_DIR, "programas.txt")
+RUTA_CURSOS = os.path.join(_DATA_DIR, "cursos.txt")
+RUTA_ESTUDIANTES = os.path.join(_DATA_DIR, "estudiantes.txt")
+RUTA_MATRICULAS = os.path.join(_DATA_DIR, "matriculas.txt")
+RUTA_PROFESORES = os.path.join(_DATA_DIR, "profesores.txt")
+RUTA_ADMINISTRATIVOS = os.path.join(_DATA_DIR, "administrativos.txt")
 
 
 def menu_facultades(facultades):

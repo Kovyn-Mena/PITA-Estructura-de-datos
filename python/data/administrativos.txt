@@ -1,6 +1,6 @@
-A001|Roberto Silva|Secretario Academico|Nivel 2|Planta|2800000|FIS|1
-A002|Patricia Nunez|Auxiliar Financiero|Nivel 1|Provisional|1800000|FCA|1
-A003|Fernando Diaz|Jefe de Bienestar Universitario|Nivel 3|Planta|3500000||1
-A004|Carolina Reyes|Auxiliar de Biblioteca|Nivel 1|Contrato|1600000|FCS|1
-A005|Hector Molina|Coordinador de Admisiones|Nivel 2|Provisional|2600000||1
-A006|Monica Paez|Asistente de Decanatura|Nivel 1|Contrato|1700000|FIS|0
+A001|Roberto Silva|Secretario Academico|Nivel 2|Planta|2800000.00|FIS|1
+A002|Patricia Nunez|Auxiliar Financiero|Nivel 1|Provisional|1800000.00|FCA|1
+A003|Fernando Diaz|Jefe de Bienestar Universitario|Nivel 3|Planta|3500000.00||1
+A004|Carolina Reyes|Auxiliar de Biblioteca|Nivel 1|Contrato|1600000.00|FCS|1
+A005|Hector Molina|Coordinador de Admisiones|Nivel 2|Provisional|2600000.00||1
+A006|Monica Paez|Asistente de Decanatura|Nivel 1|Contrato|1700000.00|FIS|0
