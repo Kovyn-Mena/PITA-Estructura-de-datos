@@ -126,6 +126,7 @@ Administrativo (N) — asociado a Facultad o a nivel central, no depende de Prog
 | categoria | string |
 | tipo_contratacion | enum {Planta, Provisional, Contrato} |
 | salario_base | float |
+| codigo_facultad | string (FK, OPCIONAL — vacio = nivel central, ej. Rectoria) |
 | activo | bool |
 
 ---

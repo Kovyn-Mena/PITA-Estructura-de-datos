@@ -264,5 +264,44 @@ vector<Profesor> cargarProfesores(const string& ruta) {
 }
 
 // =========================================================================
-// TODO: implementar guardar/cargar para Administrativo, siguiendo el mismo patron.
+// ADMINISTRATIVOS
 // =========================================================================
+
+void guardarAdministrativos(const vector<Administrativo>& v, const string& ruta) {
+    ofstream archivo(ruta);
+    if (!archivo.is_open()) {
+        cout << "No se pudo abrir " << ruta << " para escritura.\n";
+        return;
+    }
+    for (const auto& a : v) {
+        archivo << a.identificacion << "|" << a.nombreCompleto << "|" << a.cargo << "|"
+                << a.categoria << "|" << a.tipoContratacion << "|" << a.salarioBase << "|"
+                << a.codigoFacultad << "|" << (a.activo ? 1 : 0) << "\n";
+    }
+    archivo.close();
+}
+
+vector<Administrativo> cargarAdministrativos(const string& ruta) {
+    vector<Administrativo> resultado;
+    ifstream archivo(ruta);
+    if (!archivo.is_open()) return resultado;
+
+    string linea;
+    while (getline(archivo, linea)) {
+        if (linea.empty()) continue;
+        vector<string> campos = split(linea, '|');
+        if (campos.size() < 8) continue;
+        Administrativo a;
+        a.identificacion = campos[0];
+        a.nombreCompleto = campos[1];
+        a.cargo = campos[2];
+        a.categoria = campos[3];
+        a.tipoContratacion = campos[4];
+        a.salarioBase = stod(campos[5]);
+        a.codigoFacultad = campos[6];
+        a.activo = (campos[7] == "1");
+        resultado.push_back(a);
+    }
+    archivo.close();
+    return resultado;
+}

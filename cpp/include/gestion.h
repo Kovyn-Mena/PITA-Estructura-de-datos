@@ -53,7 +53,7 @@ void eliminarProfesor(std::vector<Profesor>& profesores, const std::string& id);
 void consultarProfesor(std::vector<Profesor>& profesores, const std::string& id); // desglose de nomina
 
 // ===================== ADMINISTRATIVOS =====================
-void crearAdministrativo(std::vector<Administrativo>& admins);
+void crearAdministrativo(std::vector<Administrativo>& admins, std::vector<Facultad>& facultades);
 void listarAdministrativos(const std::vector<Administrativo>& admins);
 Administrativo* buscarAdministrativo(std::vector<Administrativo>& admins, const std::string& id);
 void modificarAdministrativo(std::vector<Administrativo>& admins, const std::string& id);

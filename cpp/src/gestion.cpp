@@ -3,6 +3,7 @@
 #include "../include/nomina.h"
 #include <iostream>
 #include <limits>
+#include <iomanip>
 
 using namespace std;
 
@@ -591,7 +592,111 @@ void consultarProfesor(vector<Profesor>& profesores, const string& id) {
 }
 
 // =========================================================================
-// ADMINISTRATIVOS
-// TODO: replicar el mismo patron (siguiente bloque).
-// Los prototipos ya estan declarados en gestion.h.
+// ADMINISTRATIVOS — mismo patron que las demas entidades. La facultad es
+// OPCIONAL (vacia = nivel central, ej. Rectoria); si se indica, se valida
+// que exista. El tipo de contratacion se elige por menu numerado (igual
+// que en Profesor) para no arriesgar el calculo del salario por un
+// error de tipeo.
 // =========================================================================
+
+void crearAdministrativo(vector<Administrativo>& admins, vector<Facultad>& facultades) {
+    Administrativo a;
+    a.identificacion = leerPalabra("Identificacion (o 'cancelar' para volver): ");
+    if (esCancelar(a.identificacion)) { cout << "Operacion cancelada.\n"; return; }
+
+    if (buscarAdministrativo(admins, a.identificacion) != nullptr) {
+        cout << "Ya existe un administrativo con esa identificacion.\n";
+        return;
+    }
+
+    cout << "Nombre completo: ";
+    getline(cin, a.nombreCompleto);
+
+    cout << "Cargo (ej. Secretario Academico, Auxiliar Financiero): ";
+    getline(cin, a.cargo);
+
+    cout << "Categoria (ej. Nivel 1, Nivel 2, Nivel 3): ";
+    getline(cin, a.categoria);
+
+    a.codigoFacultad = leerPalabra("Codigo de facultad (ENTER en blanco = nivel central): ");
+    if (!a.codigoFacultad.empty()) {
+        if (buscarFacultad(facultades, a.codigoFacultad) == nullptr) {
+            cout << "Esa facultad no existe. Cree primero la facultad, o deje en blanco para nivel central.\n";
+            return;
+        }
+    }
+
+    cout << "\nTipo de contratacion:\n";
+    cout << "1. Planta\n2. Provisional\n3. Contrato\n";
+    cout << "Opcion: ";
+    int tipoOpcion = leerEntero();
+    switch (tipoOpcion) {
+        case 1: a.tipoContratacion = "Planta"; break;
+        case 2: a.tipoContratacion = "Provisional"; break;
+        case 3: a.tipoContratacion = "Contrato"; break;
+        default:
+            cout << "Opcion de tipo de contratacion invalida.\n";
+            return;
+    }
+
+    cout << "Salario base: ";
+    a.salarioBase = leerEntero(); // el salario se maneja como valor entero en pesos
+
+    a.activo = true;
+    admins.push_back(a);
+    cout << "Administrativo creado correctamente.\n";
+}
+
+void listarAdministrativos(const vector<Administrativo>& admins) {
+    cout << "\n--- Administrativos registrados ---\n";
+    if (admins.empty()) {
+        cout << "(no hay administrativos registrados)\n";
+        return;
+    }
+    cout << fixed << setprecision(2);
+    for (const auto& a : admins) {
+        cout << a.identificacion << " | " << a.nombreCompleto << " | " << a.cargo
+             << " | " << a.categoria << " | " << a.tipoContratacion
+             << " | Facultad: " << (a.codigoFacultad.empty() ? "(nivel central)" : a.codigoFacultad)
+             << " | Salario base: $" << a.salarioBase
+             << " | " << (a.activo ? "Activo" : "Inactivo") << "\n";
+    }
+}
+
+Administrativo* buscarAdministrativo(vector<Administrativo>& admins, const string& id) {
+    for (auto& a : admins) {
+        if (a.identificacion == id) return &a;
+    }
+    return nullptr;
+}
+
+void modificarAdministrativo(vector<Administrativo>& admins, const string& id) {
+    Administrativo* a = buscarAdministrativo(admins, id);
+    if (!a) { cout << "Administrativo no encontrado.\n"; return; }
+
+    cout << "Nuevo nombre (" << a->nombreCompleto << "): ";
+    getline(cin, a->nombreCompleto);
+    cout << "Nuevo cargo (" << a->cargo << "): ";
+    getline(cin, a->cargo);
+    cout << "Nuevo salario base (" << a->salarioBase << "): ";
+    a->salarioBase = leerEntero();
+    cout << "Administrativo modificado.\n";
+}
+
+void desactivarAdministrativo(vector<Administrativo>& admins, const string& id) {
+    Administrativo* a = buscarAdministrativo(admins, id);
+    if (!a) { cout << "Administrativo no encontrado.\n"; return; }
+    a->activo = false;
+    cout << "Administrativo desactivado (borrado logico).\n";
+}
+
+void eliminarAdministrativo(vector<Administrativo>& admins, const string& id) {
+    for (size_t i = 0; i < admins.size(); i++) {
+        if (admins[i].identificacion == id) {
+            admins.erase(admins.begin() + i);
+            cout << "Administrativo eliminado permanentemente.\n";
+            return;
+        }
+    }
+    cout << "Administrativo no encontrado.\n";
+}

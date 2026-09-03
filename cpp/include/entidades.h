@@ -43,6 +43,7 @@ struct Administrativo {
     std::string categoria;
     std::string tipoContratacion;
     double salarioBase;
+    std::string codigoFacultad; // opcional: vacio = nivel central (rectoria, etc.)
     bool activo;
 };
 

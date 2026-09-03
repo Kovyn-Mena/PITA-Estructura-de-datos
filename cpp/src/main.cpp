@@ -13,6 +13,7 @@ const string RUTA_CURSOS = "data/cursos.txt";
 const string RUTA_ESTUDIANTES = "data/estudiantes.txt";
 const string RUTA_MATRICULAS = "data/matriculas.txt";
 const string RUTA_PROFESORES = "data/profesores.txt";
+const string RUTA_ADMINISTRATIVOS = "data/administrativos.txt";
 // TODO: agregar rutas de los demas archivos de datos a medida que se implementen.
 
 // NOTA DE DISEÑO (pantalla): cada menu limpia la pantalla ANTES de
@@ -234,6 +235,43 @@ void menuProfesores(vector<Profesor>& profesores, vector<Programa>& programas) {
     } while (opcion != 0);
 }
 
+void menuAdministrativos(vector<Administrativo>& admins, vector<Facultad>& facultades) {
+    int opcion = -1;
+    do {
+        limpiarPantalla();
+        cout << "\n--- Menu Administrativos ---\n";
+        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
+        opcion = leerOpcionInmediata("Opcion: ");
+
+        string id;
+        switch (opcion) {
+            case 1: crearAdministrativo(admins, facultades); pausar(); break;
+            case 2: listarAdministrativos(admins); pausar(); break;
+            case 3:
+                cout << "Identificacion a modificar: "; cin >> id;
+                modificarAdministrativo(admins, id);
+                pausar();
+                break;
+            case 4:
+                cout << "Identificacion a desactivar: "; cin >> id;
+                desactivarAdministrativo(admins, id);
+                pausar();
+                break;
+            case 5:
+                cout << "Identificacion a eliminar: "; cin >> id;
+                if (leerSiNo("Esta accion NO se puede deshacer. Confirma? (s/n): ") == 's') {
+                    eliminarAdministrativo(admins, id);
+                } else {
+                    cout << "Operacion cancelada.\n";
+                }
+                pausar();
+                break;
+            case 0: break;
+            default: cout << "Opcion invalida.\n"; pausar();
+        }
+    } while (opcion != 0);
+}
+
 int main() {
     limpiarPantalla();
     cout << "=====================================================\n";
@@ -246,6 +284,7 @@ int main() {
     vector<Curso> cursos;
     vector<Estudiante> estudiantes;
     vector<Profesor> profesores;
+    vector<Administrativo> administrativos;
 
     // Requisito del taller: el usuario decide si cargar datos existentes.
     // leerSiNo() detecta la respuesta con una sola tecla, sin esperar ENTER,
@@ -260,9 +299,11 @@ int main() {
         cursos = cargarCursos(RUTA_CURSOS);
         estudiantes = cargarEstudiantes(RUTA_ESTUDIANTES, RUTA_MATRICULAS);
         profesores = cargarProfesores(RUTA_PROFESORES);
+        administrativos = cargarAdministrativos(RUTA_ADMINISTRATIVOS);
         cout << "Datos cargados: " << facultades.size() << " facultad(es), "
              << programas.size() << " programa(s), " << cursos.size() << " curso(s), "
-             << estudiantes.size() << " estudiante(s), " << profesores.size() << " profesor(es).\n";
+             << estudiantes.size() << " estudiante(s), " << profesores.size() << " profesor(es), "
+             << administrativos.size() << " administrativo(s).\n";
     } else {
         cout << "Iniciando sin datos precargados.\n";
     }
@@ -277,7 +318,7 @@ int main() {
         cout << "3. Gestionar Cursos\n";
         cout << "4. Gestionar Estudiantes\n";
         cout << "5. Gestionar Profesores\n";
-        cout << "6. Gestionar Administrativos [TODO]\n";
+        cout << "6. Gestionar Administrativos\n";
         cout << "7. Recargar datos desde archivo\n";
         cout << "0. Guardar y salir\n";
         opcionPrincipal = leerOpcionInmediata("Opcion: ");
@@ -298,6 +339,9 @@ int main() {
             case 5:
                 menuProfesores(profesores, programas);
                 break;
+            case 6:
+                menuAdministrativos(administrativos, facultades);
+                break;
             case 7:
                 // "Volver atras" ante un error al inicio: descarta lo que
                 // haya en memoria (sin guardar) y recarga tal cual esta
@@ -309,9 +353,11 @@ int main() {
                     cursos = cargarCursos(RUTA_CURSOS);
                     estudiantes = cargarEstudiantes(RUTA_ESTUDIANTES, RUTA_MATRICULAS);
                     profesores = cargarProfesores(RUTA_PROFESORES);
+                    administrativos = cargarAdministrativos(RUTA_ADMINISTRATIVOS);
                     cout << "Datos recargados desde archivo: " << facultades.size() << " facultad(es), "
                          << programas.size() << " programa(s), " << cursos.size() << " curso(s), "
-                         << estudiantes.size() << " estudiante(s), " << profesores.size() << " profesor(es).\n";
+                         << estudiantes.size() << " estudiante(s), " << profesores.size() << " profesor(es), "
+                         << administrativos.size() << " administrativo(s).\n";
                 } else {
                     cout << "Operacion cancelada.\n";
                 }
@@ -323,6 +369,7 @@ int main() {
                 guardarCursos(cursos, RUTA_CURSOS);
                 guardarEstudiantes(estudiantes, RUTA_ESTUDIANTES, RUTA_MATRICULAS);
                 guardarProfesores(profesores, RUTA_PROFESORES);
+                guardarAdministrativos(administrativos, RUTA_ADMINISTRATIVOS);
                 cout << "Datos guardados. Hasta luego.\n";
                 break;
             default:
