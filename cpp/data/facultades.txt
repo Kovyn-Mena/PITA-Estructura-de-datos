@@ -1,3 +1,7 @@
-FIS|Facultad de Ingenierias y Tecnologicas|Por definir|1
-FCA|Facultad de Ciencias Administrativas Contables y Economicas|Por definir|1
+FACE|Facultad de Ciencias Administrativas Contables y Economicas|Por definir|1
+FING|Facultad de Ingenierias y Tecnologias|Armando Luis Cotes de Armas|1
 FCS|Facultad de Ciencias de la Salud|Por definir|1
+FDCP|Facultad de Derecho Ciencias Politicas y Sociales|Por definir|1
+FBA|Facultad de Bellas Artes|Por definir|1
+FED|Facultad de Educacion|Por definir|1
+FCB|Facultad de Ciencias Basicas|Por definir|1

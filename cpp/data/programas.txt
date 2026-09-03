@@ -1,6 +1,22 @@
-SIS|Ingenieria de Sistemas|Pregrado|FIS|1
-IND|Ingenieria Industrial|Pregrado|FIS|1
-ADM|Administracion de Empresas|Pregrado|FCA|1
-CP|Contaduria Publica|Pregrado|FCA|1
-MED|Medicina|Pregrado|FCS|1
+ADM|Administracion de Empresas|Pregrado|FACE|1
+AEH|Administracion de Empresas Turisticas y Hoteleras|Pregrado|FACE|1
+COM|Comercio Internacional|Pregrado|FACE|1
+CP|Contaduria Publica|Pregrado|FACE|1
+ECO|Economia|Pregrado|FACE|1
+AGR|Ingenieria Agroindustrial|Pregrado|FING|1
+AMB|Ingenieria Ambiental y Sanitaria|Pregrado|FING|1
+SIS|Ingenieria de Sistemas|Pregrado|FING|1
+ELE|Ingenieria Electronica|Pregrado|FING|1
 ENF|Enfermeria|Pregrado|FCS|1
+IQ|Instrumentacion Quirurgica|Pregrado|FCS|1
+MIB|Microbiologia|Pregrado|FCB|1
+DER|Derecho|Pregrado|FDCP|1
+PSI|Psicologia|Pregrado|FDCP|1
+SOC|Sociologia|Pregrado|FDCP|1
+ART|Licenciatura en Artes|Pregrado|FBA|1
+MUS|Musica|Pregrado|FBA|1
+MAT|Licenciatura en Matematicas|Pregrado|FED|1
+LEI|Licenciatura en Espanol e Ingles|Pregrado|FED|1
+LLC|Licenciatura en Literatura y Lengua Castellana|Pregrado|FED|1
+EDF|Licenciatura en Educacion Fisica Recreacion y Deportes|Pregrado|FED|1
+CNA|Licenciatura en Ciencias Naturales y Educacion Ambiental|Pregrado|FED|1
