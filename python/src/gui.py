@@ -152,6 +152,13 @@ class PitaApp(tk.Tk):
         self.notebook = None
         self.pantalla_inicio = None
 
+        # Navegación jerárquica Facultad → Programa → Curso.
+        # None significa que se muestran todos los registros.
+        self.filtro_facultad_programas = None
+        self.filtro_programa_cursos = None
+        self.tab_programas = None
+        self.tab_cursos = None
+
         self._configurar_estilo()
         self._construir_header()
         # Los datos se cargan antes de mostrar el menú para que la pantalla
@@ -342,7 +349,7 @@ class PitaApp(tk.Tk):
     # ---------------- FACULTADES ----------------
 
     def _tab_facultades(self):
-        _, self.tree_facultades, btns = self._crear_shell_tab(
+        self.tab_facultades, self.tree_facultades, btns = self._crear_shell_tab(
             "Facultades", ["Código", "Nombre", "Decano", "Estado"])
 
         ttk.Button(btns, text="Nueva", style="Accent.TButton",
@@ -351,7 +358,9 @@ class PitaApp(tk.Tk):
         ttk.Button(btns, text="Activar/Desactivar", command=self._facultad_toggle).pack(side="left", padx=4)
         ttk.Button(btns, text="Eliminar", style="Danger.TButton",
                    command=self._facultad_eliminar).pack(side="left", padx=4)
+        ttk.Button(btns, text="Ver programas", command=self._ir_a_programas_filtrados).pack(side="left", padx=4)
 
+        self.tree_facultades.bind("<Double-1>", self._doble_click_facultad)
         self._refrescar_facultades()
 
     def _refrescar_facultades(self):
@@ -422,7 +431,7 @@ class PitaApp(tk.Tk):
     # ---------------- PROGRAMAS ----------------
 
     def _tab_programas(self):
-        _, self.tree_programas, btns = self._crear_shell_tab(
+        self.tab_programas, self.tree_programas, btns = self._crear_shell_tab(
             "Programas", ["Código", "Nombre", "Nivel", "Facultad", "Estado"])
 
         ttk.Button(btns, text="Nuevo", style="Accent.TButton",
@@ -431,14 +440,90 @@ class PitaApp(tk.Tk):
         ttk.Button(btns, text="Activar/Desactivar", command=self._programa_toggle).pack(side="left", padx=4)
         ttk.Button(btns, text="Eliminar", style="Danger.TButton",
                    command=self._programa_eliminar).pack(side="left", padx=4)
+        ttk.Button(btns, text="Ver cursos", command=self._ir_a_cursos_filtrados).pack(side="left", padx=4)
+        ttk.Button(btns, text="Mostrar todos", command=self._mostrar_todos_programas).pack(side="left", padx=4)
+        ttk.Button(btns, text="← Facultades", command=self._volver_a_facultades).pack(side="right", padx=4)
 
+        self.tree_programas.bind("<Double-1>", self._doble_click_programa)
         self._refrescar_programas()
 
     def _refrescar_programas(self):
         self.tree_programas.delete(*self.tree_programas.get_children())
         for p in self.programas:
+            if self.filtro_facultad_programas and p.codigo_facultad != self.filtro_facultad_programas:
+                continue
             self.tree_programas.insert("", "end", iid=p.codigo,
                 values=(p.codigo, p.nombre, p.nivel, p.codigo_facultad, self._fila_activo(p.activo)))
+        self._actualizar_titulo_programas()
+
+    # ---------------- NAVEGACIÓN JERÁRQUICA ----------------
+
+    def _doble_click_facultad(self, event=None):
+        self._ir_a_programas_filtrados()
+
+    def _doble_click_programa(self, event=None):
+        self._ir_a_cursos_filtrados()
+
+    def _ir_a_programas_filtrados(self):
+        f = self._facultad_seleccionada()
+        if not f:
+            return
+        self.filtro_facultad_programas = f.codigo
+        self.filtro_programa_cursos = None
+        self._refrescar_programas()
+        self.notebook.select(self.tab_programas)
+        self._set_status(f"Mostrando programas de la facultad: {f.nombre} ({f.codigo}).")
+
+    def _mostrar_todos_programas(self):
+        self.filtro_facultad_programas = None
+        self._refrescar_programas()
+        self.notebook.select(self.tab_programas)
+        self._set_status("Mostrando todos los programas.")
+
+    def _ir_a_cursos_filtrados(self):
+        p = self._programa_seleccionado()
+        if not p:
+            return
+        self.filtro_programa_cursos = p.codigo
+        self._refrescar_cursos()
+        self.notebook.select(self.tab_cursos)
+        self._set_status(f"Mostrando cursos del programa: {p.nombre} ({p.codigo}).")
+
+    def _mostrar_todos_cursos(self):
+        self.filtro_programa_cursos = None
+        self._refrescar_cursos()
+        self.notebook.select(self.tab_cursos)
+        self._set_status("Mostrando todos los cursos.")
+
+    def _volver_a_facultades(self):
+        self.notebook.select(self.tab_facultades)
+        self._set_status("Selecciona una facultad para consultar sus programas.")
+
+    def _volver_a_programas(self):
+        self.filtro_programa_cursos = None
+        self._refrescar_programas()
+        self.notebook.select(self.tab_programas)
+        self._set_status("Selecciona un programa para consultar sus cursos.")
+
+    def _actualizar_titulo_programas(self):
+        if self.notebook is None or self.tab_programas is None:
+            return
+        if self.filtro_facultad_programas:
+            f = buscar_facultad(self.facultades, self.filtro_facultad_programas)
+            texto = f"Programas — {f.codigo}" if f else "Programas"
+        else:
+            texto = "Programas"
+        self.notebook.tab(self.tab_programas, text=texto)
+
+    def _actualizar_titulo_cursos(self):
+        if self.notebook is None or self.tab_cursos is None:
+            return
+        if self.filtro_programa_cursos:
+            p = buscar_programa(self.programas, self.filtro_programa_cursos)
+            texto = f"Cursos — {p.codigo}" if p else "Cursos"
+        else:
+            texto = "Cursos"
+        self.notebook.tab(self.tab_cursos, text=texto)
 
     def _programa_seleccionado(self):
         sel = self.tree_programas.selection()
@@ -515,7 +600,7 @@ class PitaApp(tk.Tk):
     # ---------------- CURSOS ----------------
 
     def _tab_cursos(self):
-        _, self.tree_cursos, btns = self._crear_shell_tab(
+        self.tab_cursos, self.tree_cursos, btns = self._crear_shell_tab(
             "Cursos", ["Código", "Nombre", "Créditos", "Programa", "Profesor", "Estado"])
 
         ttk.Button(btns, text="Nuevo", style="Accent.TButton",
@@ -524,15 +609,20 @@ class PitaApp(tk.Tk):
         ttk.Button(btns, text="Activar/Desactivar", command=self._curso_toggle).pack(side="left", padx=4)
         ttk.Button(btns, text="Eliminar", style="Danger.TButton",
                    command=self._curso_eliminar).pack(side="left", padx=4)
+        ttk.Button(btns, text="Mostrar todos", command=self._mostrar_todos_cursos).pack(side="left", padx=4)
+        ttk.Button(btns, text="← Programas", command=self._volver_a_programas).pack(side="right", padx=4)
 
         self._refrescar_cursos()
 
     def _refrescar_cursos(self):
         self.tree_cursos.delete(*self.tree_cursos.get_children())
         for c in self.cursos:
+            if self.filtro_programa_cursos and c.codigo_programa != self.filtro_programa_cursos:
+                continue
             prof = c.codigo_profesor if c.codigo_profesor else "(sin asignar)"
             self.tree_cursos.insert("", "end", iid=c.codigo,
                 values=(c.codigo, c.nombre, c.creditos, c.codigo_programa, prof, self._fila_activo(c.activo)))
+        self._actualizar_titulo_cursos()
 
     def _curso_seleccionado(self):
         sel = self.tree_cursos.selection()
