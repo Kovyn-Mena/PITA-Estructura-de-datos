@@ -32,7 +32,7 @@ void menuFacultades(vector<Facultad>& facultades) {
     do {
         limpiarPantalla();
         cout << "\n--- Menu Facultades ---\n";
-        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
+        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver (o presione ENTER)\n";
         opcion = leerOpcionInmediata("Opcion: ");
 
         string codigo;
@@ -69,7 +69,7 @@ void menuProgramas(vector<Programa>& programas, vector<Facultad>& facultades) {
     do {
         limpiarPantalla();
         cout << "\n--- Menu Programas ---\n";
-        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
+        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver (o presione ENTER)\n";
         opcion = leerOpcionInmediata("Opcion: ");
 
         string codigo;
@@ -106,7 +106,7 @@ void menuCursos(vector<Curso>& cursos, vector<Programa>& programas) {
     do {
         limpiarPantalla();
         cout << "\n--- Menu Cursos ---\n";
-        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
+        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver (o presione ENTER)\n";
         opcion = leerOpcionInmediata("Opcion: ");
 
         string codigo;
@@ -145,7 +145,7 @@ void menuEstudiantes(vector<Estudiante>& estudiantes, vector<Programa>& programa
         cout << "\n--- Menu Estudiantes ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n";
         cout << "6. Matricular curso\n7. Cancelar curso\n8. Ver ficha (promedio + alerta EBRA)\n";
-        cout << "0. Volver\n";
+        cout << "0. Volver (o presione ENTER)\n";
         opcion = leerOpcionInmediata("Opcion: ");
 
         string id;
@@ -198,7 +198,7 @@ void menuProfesores(vector<Profesor>& profesores, vector<Programa>& programas) {
         limpiarPantalla();
         cout << "\n--- Menu Profesores ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n";
-        cout << "6. Ver desglose de nomina\n0. Volver\n";
+        cout << "6. Ver desglose de nomina\n0. Volver (o presione ENTER)\n";
         opcion = leerOpcionInmediata("Opcion: ");
 
         string id;
@@ -240,7 +240,7 @@ void menuAdministrativos(vector<Administrativo>& admins, vector<Facultad>& facul
     do {
         limpiarPantalla();
         cout << "\n--- Menu Administrativos ---\n";
-        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver\n";
+        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver (o presione ENTER)\n";
         opcion = leerOpcionInmediata("Opcion: ");
 
         string id;
@@ -320,7 +320,7 @@ int main() {
         cout << "5. Gestionar Profesores\n";
         cout << "6. Gestionar Administrativos\n";
         cout << "7. Recargar datos desde archivo\n";
-        cout << "0. Guardar y salir\n";
+        cout << "0. Guardar y salir (o presione ENTER)\n";
         opcionPrincipal = leerOpcionInmediata("Opcion: ");
 
         switch (opcionPrincipal) {

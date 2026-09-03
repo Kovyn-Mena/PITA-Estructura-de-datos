@@ -67,6 +67,11 @@ int leerOpcionInmediata(const string& mensaje) {
         cout << mensaje;
         c = leerCaracterInmediato();
         cout << "\n";
+        if (c == '\n' || c == '\r') {
+            // ENTER por si solo se interpreta como "Volver"/"Salir" (opcion 0).
+            // Es el comportamiento que la mayoria espera por instinto.
+            return 0;
+        }
         if (isdigit(static_cast<unsigned char>(c))) {
             return c - '0'; // convierte el caracter '0'-'9' al numero real
         }
