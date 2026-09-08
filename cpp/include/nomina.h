@@ -2,34 +2,59 @@
 #define NOMINA_H
 
 #include "entidades.h"
+#include <string>
 
-// Valor del punto salarial: PARAMETRO configurable, no debe quedar fijo en el codigo.
-// Referencia historica: $20.895 COP para el ano 2024 (Decreto 1279 de 2002).
+// Parámetros vigentes 2026
 extern double VALOR_PUNTO;
+extern double SMMLV;
 
-// Puntos fijos por categoria del escalafon (Decreto 1279, Art. 8)
+// ── Docentes ──
 int puntosPorCategoria(const std::string& categoria);
-
-// Calcula el total de puntos de un profesor (categoria + titulos + productividad)
 int totalPuntos(const Profesor& p);
-
-// Aplica el factor de proporcionalidad segun la dedicacion
-// (Ej: catedra por horas se calcula proporcional a 18h = tiempo completo de catedra)
 double factorProporcionalidad(const Profesor& p);
-
-// Salario bruto = totalPuntos * VALOR_PUNTO * factorProporcionalidad
+double factorOcasional(const Profesor& p);
 double calcularSalarioBruto(const Profesor& p);
+bool liquidacionDisponible(const Profesor& p);
+std::string observacionNormativa(const Profesor& p);
 
-// Deducciones de ley (simuladas, porcentajes estandar)
-double calcularDescuentoSalud(double salarioBruto);    // 4%
-double calcularDescuentoPension(double salarioBruto);  // 4%
+// Descuentos empleado (redondeo a pesos enteros según Decreto 1990/2016)
+long long calcularDescuentoSalud(double salarioBruto);
+long long calcularDescuentoPension(double salarioBruto);
+long long calcularDescuentoFSP(double salarioBruto);
 double calcularSalarioNeto(const Profesor& p);
 
-// Informativo (no se resta del neto, solo se muestra)
+// Prestaciones sociales (provisión mensual)
 double calcularPrimaServicios(double salarioBruto);
 double calcularCesantias(double salarioBruto);
+double calcularInteresesCesantias(double salarioBruto);
+double calcularPrimaNavidad(double salarioBruto);
+double calcularVacaciones(double salarioBruto);
+double calcularPrimaVacaciones(double salarioBruto);
+double calcularBonificacionServicios(double salarioBruto);
+double calcularTotalPrestaciones(double salarioBruto);
 
-// Imprime el desglose completo de nomina de un profesor (para el "aspecto estetico")
+// Aportes patronales UPC
+struct AportesPatronales {
+    long long pension;
+    long long salud;
+    long long arl;
+    long long caja;
+    long long total;
+};
+
+AportesPatronales calcularAportesPatronales(double salarioBruto);
+double calcularCostoTotalEmpleador(const Profesor& p);
 void imprimirDesgloseNomina(const Profesor& p);
+
+// ── Administrativos ──
+double salarioBaseAdministrativo(const std::string& categoria);
+double calcularSalarioBrutoAdmin(const Administrativo& a);
+long long calcularDescuentoSaludAdmin(double salarioBruto);
+long long calcularDescuentoPensionAdmin(double salarioBruto);
+long long calcularDescuentoFSPAdmin(double salarioBruto);
+double calcularSalarioNetoAdmin(const Administrativo& a);
+AportesPatronales calcularAportesPatronalesAdmin(double salarioBruto);
+double calcularCostoTotalAdmin(const Administrativo& a);
+void imprimirDesgloseNominaAdmin(const Administrativo& a);
 
 #endif

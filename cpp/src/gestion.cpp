@@ -615,8 +615,19 @@ void crearAdministrativo(vector<Administrativo>& admins, vector<Facultad>& facul
     cout << "Cargo (ej. Secretario Academico, Auxiliar Financiero): ";
     getline(cin, a.cargo);
 
-    cout << "Categoria (ej. Nivel 1, Nivel 2, Nivel 3): ";
-    getline(cin, a.categoria);
+    cout << "\nCategoria (Escala Salarial):\n";
+    cout << "1. Nivel 1 (Asistencial/Auxiliar - $1.950.000)\n";
+    cout << "2. Nivel 2 (Tecnico/Secretarial - $2.800.000)\n";
+    cout << "3. Nivel 3 (Profesional/Coordinador - $3.750.000)\n";
+    cout << "4. Nivel 4 (Directivo/Asesor/Jefe - $5.050.000)\n";
+    cout << "Opcion: ";
+    int catOp = leerEntero();
+    switch (catOp) {
+        case 2: a.categoria = "Nivel 2"; break;
+        case 3: a.categoria = "Nivel 3"; break;
+        case 4: a.categoria = "Nivel 4"; break;
+        default: a.categoria = "Nivel 1"; break;
+    }
 
     a.codigoFacultad = leerPalabra("Codigo de facultad (ENTER en blanco = nivel central): ");
     if (!a.codigoFacultad.empty()) {
@@ -639,12 +650,16 @@ void crearAdministrativo(vector<Administrativo>& admins, vector<Facultad>& facul
             return;
     }
 
-    cout << "Salario base: ";
-    a.salarioBase = leerEntero(); // el salario se maneja como valor entero en pesos
+    cout << "Salario base (0 para asignar segun escala legal " << a.categoria << "): ";
+    double salInput = leerEntero();
+    if (salInput <= 0) {
+        salInput = salarioBaseAdministrativo(a.categoria);
+    }
+    a.salarioBase = salInput;
 
     a.activo = true;
     admins.push_back(a);
-    cout << "Administrativo creado correctamente.\n";
+    cout << "Administrativo creado correctamente con salario base de $" << a.salarioBase << " COP.\n";
 }
 
 void listarAdministrativos(const vector<Administrativo>& admins) {
@@ -653,12 +668,12 @@ void listarAdministrativos(const vector<Administrativo>& admins) {
         cout << "(no hay administrativos registrados)\n";
         return;
     }
-    cout << fixed << setprecision(2);
+    cout << fixed << setprecision(0);
     for (const auto& a : admins) {
         cout << a.identificacion << " | " << a.nombreCompleto << " | " << a.cargo
              << " | " << a.categoria << " | " << a.tipoContratacion
              << " | Facultad: " << (a.codigoFacultad.empty() ? "(nivel central)" : a.codigoFacultad)
-             << " | Salario base: $" << a.salarioBase
+             << " | Salario base: $" << a.salarioBase << " COP"
              << " | " << (a.activo ? "Activo" : "Inactivo") << "\n";
     }
 }
@@ -678,9 +693,14 @@ void modificarAdministrativo(vector<Administrativo>& admins, const string& id) {
     getline(cin, a->nombreCompleto);
     cout << "Nuevo cargo (" << a->cargo << "): ";
     getline(cin, a->cargo);
-    cout << "Nuevo salario base (" << a->salarioBase << "): ";
-    a->salarioBase = leerEntero();
-    cout << "Administrativo modificado.\n";
+    cout << "Nuevo salario base (" << a->salarioBase << " COP - 0 para recalcular segun escala): ";
+    double nuevoSal = leerEntero();
+    if (nuevoSal <= 0) {
+        a->salarioBase = salarioBaseAdministrativo(a->categoria);
+    } else {
+        a->salarioBase = nuevoSal;
+    }
+    cout << "Administrativo modificado con salario base de $" << a->salarioBase << " COP.\n";
 }
 
 void desactivarAdministrativo(vector<Administrativo>& admins, const string& id) {

@@ -1,69 +1,77 @@
-# PITA — Integrated Program for Academic Transactions
-Universidad Popular del Cesar · Data Structures · Workshop 1
+# PITA — Programa Integrado de Transacciones Académicas
+Universidad Popular del Cesar · Estructura de Datos · Taller 1
 
-Group: [Kovyn Mena]
+Grupo: [nombres e iniciales de los integrantes]
 
-## Project Structure
-```text
+## Contenido del proyecto
+```
 PITA/
-├── cpp/            C++ Version
-│   ├── include/     Headers (.h): entities, management, payroll, persistence
-│   ├── src/         Implementation (.cpp) and main.cpp
-│   ├── data/        Data files (plain text)
+├── cpp/            Version en C++
+│   ├── include/     Headers (.h): entidades, gestion, nomina, persistencia
+│   ├── src/         Implementacion (.cpp) y main.cpp
+│   ├── data/        Archivos de datos (texto plano)
 │   └── Makefile
-├── python/         Python Version (same logic and data format)
+├── python/         Version en Python (misma logica y formato de datos)
 │   ├── src/         entidades.py, gestion.py, nomina.py, persistencia.py, main.py
-│   └── data/        Data files (plain text)
-└── docs/           Design diagrams and persistence format specification
-
+│   └── data/        Archivos de datos (texto plano)
+└── docs/           Diagrama de diseño y especificación del formato de persistencia
 ```
 
-## How to Run — C++ Version
+## Cómo ejecutar — versión C++
 
-Requirements: `g++` with C++17 support (any standard Linux/Mac/WSL installation will work).
+Requisitos: `g++` con soporte C++17 (cualquier instalación estándar de Linux/Mac/WSL sirve).
 
 ```bash
 cd cpp
 make run
-
 ```
 
-This compiles (`make`) and executes (`./pita`) in a single step. If you only want to compile the project first:
-
+Esto compila (`make`) y ejecuta (`./pita`) en un solo paso. Si solo quieres compilar:
 ```bash
 make
 ./pita
-
 ```
 
-To clean the compiled binaries:
-
+Para limpiar el binario compilado:
 ```bash
 make clean
-
 ```
 
-## How to Run — Python Version
+## Cómo ejecutar — versión Python
 
-Requirements: Python 3.8 or higher. No external dependencies required (uses standard library only).
+Requisitos: Python 3.8 o superior. Sin dependencias externas (solo librería estándar y Tkinter).
 
+### Interfaz Gráfica (GUI recomendada):
+```bash
+python python/src/gui.py
+```
+
+### Interfaz de Consola:
 ```bash
 cd python/src
-python3 main.py
-
+python main.py
 ```
 
-## Program Usage
+## Uso del programa
+1. **Versión Gráfica (`gui.py`):**
+   - Sistema interactivo de ventanas tipo escritorio con Dock inferior.
+   - Pestañas para Facultades, Programas, Cursos, Estudiantes, Profesores, Administrativos y Nómina.
+   - Botón "Ver nómina" en Profesores y Administrativos que abre el **Desprendible Oficial de Pago** institucional (cálculo auditable UPC, deducciones de ley, prestaciones completas, aportes patronales y opción mensual/anual).
+2. **Versión C++ (`cpp/`):**
+   - Mantiene la misma lógica exacta y almacenamiento de datos.
+   - Menú interactivo en consola con opción 6 en Profesores y Administrativos para ver e imprimir el desprendible oficial.
+3. Al salir, los datos se conservan sincronizados en las carpetas `data/`.
 
-1. Upon startup, the program will ask if you want to **load existing data** from the `data/` directory or **start without data**. You can answer `s` (yes) or `n` (no).
-2. The main menu allows you to navigate through the management modules for each entity (Faculties, Programs, Courses, Students, Professors, Administrative Staff) and simulate payroll calculations.
-3. Each entity's submenu provides standard CRUD operations: Create, List, Update, Deactivate, and Delete.
-4. Upon exiting the program (option `0` in the main menu), all data is automatically saved to the `data/` directory.
+## Normativa Salarial 2026 Aplicada
+- **Docentes de Planta:** Decreto 1279 de 2002 y Decreto 318 de 2026 (Punto salarial: $23.924 COP).
+- **Docentes Ocasionales:** Acuerdo UPC 027 de 2024 (Art. 24) sobre SMMLV 2026 ($1.750.905 COP).
+- **Docentes Catedráticos:** Acuerdo UPC 027 de 2024 (Art. 23).
+- **Personal Administrativo:** Escala Salarial Oficial por Niveles (Nivel 1 al 4) y Decretos Salariales 2026.
+- **Seguridad Social y Parafiscales:** Decreto 1990 de 2016 (redondeo a pesos enteros), Salud (4% empleado / 8.5% patronal), Pensión (4% empleado / 12% patronal), Fondo Solidaridad Pensional (1% si $\ge 4$ SMMLV), ARL (0.522%) y Caja Compensación (4%).
+- **Prestaciones Sociales:** Prima de Servicios, Cesantías, Intereses de Cesantías (Ley 52/1975), Prima de Navidad, Vacaciones, Prima de Vacaciones y Bonificación por Servicios.
 
-## Test Data
-
-The project is delivered with preloaded data inside the `data/` folders for both versions. This allows the professor to test the system immediately without needing to manually input mock information.
-
-## Design Documentation
-
-Please refer to `docs/formato_persistencia.md` for a detailed breakdown of the data file formats. The comprehensive conceptual design, the applied institutional regulations (Decree 1279 of 2002 and Agreement 027 of 2024), and the reasoning behind our data structure decisions are detailed in the Word document submitted alongside this repository.
+## Documentación de diseño
+Ver `docs/formato_persistencia.md` para el detalle del formato de los archivos de datos,
+y el documento Word entregado junto con este proyecto para el diseño conceptual completo,
+la normatividad aplicada (Decreto 1279 de 2002 y Acuerdo 027 de 2024) y las decisiones
+de estructura de datos tomadas.

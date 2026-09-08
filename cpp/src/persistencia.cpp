@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <iomanip>
 
 using namespace std;
 
@@ -273,6 +274,7 @@ void guardarAdministrativos(const vector<Administrativo>& v, const string& ruta)
         cout << "No se pudo abrir " << ruta << " para escritura.\n";
         return;
     }
+    archivo << fixed << setprecision(2);
     for (const auto& a : v) {
         archivo << a.identificacion << "|" << a.nombreCompleto << "|" << a.cargo << "|"
                 << a.categoria << "|" << a.tipoContratacion << "|" << a.salarioBase << "|"

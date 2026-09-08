@@ -27,10 +27,18 @@ from gestion import (
 )
 from nomina import (
     calcular_salario_bruto, calcular_descuento_salud, calcular_descuento_pension,
+    calcular_descuento_fsp,
     calcular_salario_neto, calcular_prima_servicios, calcular_cesantias,
+    calcular_intereses_cesantias, calcular_prima_navidad,
+    calcular_vacaciones, calcular_prima_vacaciones, calcular_bonificacion_servicios,
+    calcular_total_prestaciones, calcular_aportes_patronales, calcular_costo_total_empleador,
     total_puntos, puntos_por_categoria, factor_proporcionalidad, factor_ocasional,
     regimen_nomina, liquidacion_disponible, observacion_normativa,
     VALOR_PUNTO, SMMLV, PUNTOS_PREGRADO, VALOR_HORA_CATEDRA,
+    calcular_salario_bruto_admin, calcular_descuento_salud_admin,
+    calcular_descuento_pension_admin, calcular_descuento_fsp_admin,
+    calcular_salario_neto_admin, calcular_aportes_patronales_admin,
+    calcular_costo_total_admin, salario_base_administrativo,
 )
 
 # Rutas ABSOLUTAS calculadas a partir de la ubicacion de este archivo, para
@@ -153,6 +161,12 @@ class PitaApp(tk.Tk):
         self.administrativos = []
         self.notebook = None
         self.pantalla_inicio = None
+        self.icons = {}          # referencias a PhotoImage (evita que Tkinter las borre)
+        self.secciones = {}      # id_seccion -> Frame de contenido
+        self.dock_botones = {}   # id_seccion -> widget boton (para resaltar el activo)
+        self.seccion_actual = None
+        self.titulo_vars = {}    # id_seccion -> StringVar (titulo dinamico con filtros)
+        self.refrescos_seccion = {}  # id_seccion -> funcion a llamar al entrar a esa seccion
 
         # Navegación jerárquica Facultad → Programa → Curso.
         # None significa que se muestran todos los registros.
@@ -160,9 +174,6 @@ class PitaApp(tk.Tk):
         self.filtro_programa_cursos = None
         self.filtro_programa_estudiantes = None
         self.filtro_curso_estudiantes = None
-        self.tab_programas = None
-        self.tab_cursos = None
-        self.tab_estudiantes = None
 
         self._configurar_estilo()
         self._construir_header()
@@ -231,9 +242,17 @@ class PitaApp(tk.Tk):
         self.pantalla_inicio = tk.Frame(self, bg=C["bg"])
         self.pantalla_inicio.pack(fill="both", expand=True, padx=18, pady=18)
 
+        # Solo se fija el ANCHO (relwidth); el ALTO se deja que lo determine
+        # el propio contenido empacado adentro (comportamiento por defecto
+        # de un Frame). Antes se fijaba tambien relheight=0.78, y en
+        # ventanas mas bajas (por ejemplo el tamano minimo de la ventana)
+        # el contenido no alcanzaba a caber en esa altura fija: el boton
+        # "Entrar al sistema" quedaba aplastado contra el borde inferior de
+        # la tarjeta y el boton "Salir" quedaba completamente recortado
+        # fuera de ella, aunque la ventana en si tuviera espacio de sobra.
         card = tk.Frame(self.pantalla_inicio, bg=C["card"],
                         highlightbackground="#d8dde3", highlightthickness=1)
-        card.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.78, relheight=0.78)
+        card.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.78)
 
         tk.Label(card, text="Bienvenido a PITA", font=("Segoe UI", 24, "bold"),
                  bg=C["card"], fg=C["primary"]).pack(pady=(28, 5))
@@ -298,7 +317,7 @@ class PitaApp(tk.Tk):
             self.pantalla_inicio.destroy()
             self.pantalla_inicio = None
         self.header_actions.pack(side="right", padx=16)
-        self._construir_notebook()
+        self._construir_dock()
         self._set_status(
             f"Sistema listo: {len(self.facultades)} facultades, {len(self.programas)} programas, "
             f"{len(self.cursos)} cursos, {len(self.estudiantes)} estudiantes, "
@@ -308,28 +327,143 @@ class PitaApp(tk.Tk):
     def _set_status(self, texto):
         self.status_var.set(texto)
 
-    # ---------------- Notebook (pestañas) ----------------
+    # ---------------- Dock inferior de navegación ----------------
 
-    def _construir_notebook(self):
-        if self.notebook is not None:
-            return
-        self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=14, pady=12)
+    ICONOS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
 
+    SECCIONES = [
+        ("panel", "Panel", "panel.png"),
+        ("facultades", "Facultades", "facultades.png"),
+        ("programas", "Programas", "programas.png"),
+        ("cursos", "Cursos", "cursos.png"),
+        ("estudiantes", "Estudiantes", "estudiantes.png"),
+        ("profesores", "Profesores", "profesores.png"),
+        ("nomina", "Nómina Docente", "nomina.png"),
+        ("administrativos", "Administrativos", "administrativos.png"),
+    ]
+
+    def _cargar_icono(self, nombre_archivo):
+        ruta = os.path.join(self.ICONOS_DIR, nombre_archivo)
+        img = tk.PhotoImage(file=ruta)
+        self.icons[nombre_archivo] = img  # evita que el recolector de basura la borre
+        return img
+
+    def _construir_dock(self):
+        if self.secciones:
+            return  # ya construido (por si _entrar_sistema se llama dos veces)
+
+        # El dock se empaqueta PRIMERO en "bottom" para reservar su espacio;
+        # el area de contenido se empaqueta despues y ocupa el resto.
+        # OJO: antes se forzaba una altura fija de 84px (con
+        # pack_propagate(False)), pero un icono de 64px mas su etiqueta de
+        # texto abajo mas el relleno (pady) necesitan mas que eso: el
+        # texto de cada boton quedaba cortado a la mitad. Se deja que el
+        # propio contenido (iconos + etiquetas) determine la altura del
+        # dock, que es el comportamiento por defecto de un Frame.
+        dock = tk.Frame(self, bg="#1b2a3a")
+        dock.pack(side="bottom", fill="x")
+
+        izquierda = tk.Frame(dock, bg="#1b2a3a")
+        izquierda.pack(side="left", fill="y", padx=(10, 0))
+
+        for sid, etiqueta, archivo in self.SECCIONES:
+            icono = self._cargar_icono(archivo)
+            btn = tk.Button(
+                izquierda, image=icono, text=etiqueta, compound="top",
+                font=("Segoe UI", 8, "bold"), fg="#c9d9e8", bg="#1b2a3a",
+                activebackground="#28405c", activeforeground="white",
+                relief="flat", bd=0, cursor="hand2", padx=10, pady=6,
+                command=lambda s=sid: self._mostrar_seccion(s),
+            )
+            btn.pack(side="left", padx=3, pady=6)
+            self.dock_botones[sid] = btn
+
+        # Salir separado a la derecha, con su propio color de acento rojo,
+        # visible SIEMPRE sin importar en que seccion este el usuario.
+        icono_salir = self._cargar_icono("salir.png")
+        btn_salir = tk.Button(
+            dock, image=icono_salir, text="Salir", compound="top",
+            font=("Segoe UI", 8, "bold"), fg="#f5b7b1", bg="#1b2a3a",
+            activebackground="#922b21", activeforeground="white",
+            relief="flat", bd=0, cursor="hand2", padx=14, pady=6,
+            command=self._salir,
+        )
+        btn_salir.pack(side="right", padx=16, pady=6)
+
+        # Area de contenido: ocupa todo el espacio restante arriba del dock.
+        self.content_area = tk.Frame(self, bg=C["bg"])
+        self.content_area.pack(side="top", fill="both", expand=True)
+
+        for sid, etiqueta, _archivo in self.SECCIONES:
+            frame = tk.Frame(self.content_area, bg=C["bg"])
+            self.secciones[sid] = frame
+
+        self._construir_seccion_panel(self.secciones["panel"])
         self._tab_facultades()
         self._tab_programas()
         self._tab_cursos()
         self._tab_estudiantes()
         self._tab_profesores()
         self._tab_administrativos()
+        self._tab_nomina()
 
-    def _crear_shell_tab(self, nombre_pestaña, columnas):
-        """Crea el esqueleto comun de una pestaña: card + treeview + scrollbar."""
-        outer = tk.Frame(self.notebook, bg=C["bg"])
-        self.notebook.add(outer, text=nombre_pestaña)
+        self._mostrar_seccion("panel")
+
+    def _mostrar_seccion(self, sid):
+        for otro_id, frame in self.secciones.items():
+            frame.pack_forget()
+            self.dock_botones[otro_id].configure(bg="#1b2a3a", fg="#c9d9e8")
+        self.secciones[sid].pack(fill="both", expand=True, padx=16, pady=14)
+        self.dock_botones[sid].configure(bg="#28405c", fg="white")
+        self.seccion_actual = sid
+        if sid in self.refrescos_seccion:
+            self.refrescos_seccion[sid]()
+
+    def _construir_seccion_panel(self, frame):
+        """Panel de inicio: resumen general del sistema (tipo dashboard)."""
+        tk.Label(frame, text="Panel de control", font=("Segoe UI", 16, "bold"),
+                 bg=C["bg"], fg=C["primary"]).pack(anchor="w", pady=(0, 12))
+
+        tarjetas = tk.Frame(frame, bg=C["bg"])
+        tarjetas.pack(fill="x")
+        datos = [
+            ("Facultades", len(self.facultades)), ("Programas", len(self.programas)),
+            ("Cursos", len(self.cursos)), ("Estudiantes", len(self.estudiantes)),
+            ("Profesores", len(self.profesores)), ("Administrativos", len(self.administrativos)),
+        ]
+        for i, (etiqueta, valor) in enumerate(datos):
+            card = tk.Frame(tarjetas, bg=C["card"], highlightbackground="#d8dde3", highlightthickness=1)
+            card.grid(row=i // 3, column=i % 3, padx=8, pady=8, sticky="ew")
+            tarjetas.grid_columnconfigure(i % 3, weight=1)
+            tk.Label(card, text=str(valor), font=("Segoe UI", 22, "bold"),
+                     bg=C["card"], fg=C["primary"]).pack(pady=(14, 0))
+            tk.Label(card, text=etiqueta, font=FONT, bg=C["card"], fg=C["muted"]).pack(pady=(0, 14))
+
+        tk.Label(frame, text="Usa el menú de abajo para navegar entre secciones.",
+                 font=("Segoe UI", 9, "italic"), bg=C["bg"], fg=C["muted"]).pack(anchor="w", pady=(16, 0))
+
+    def _construir_placeholder(self, frame, sid):
+        """Marcador temporal; se reemplaza por el contenido real en el
+        siguiente bloque de trabajo (migracion de cada seccion al dock)."""
+        tk.Label(frame, text="Sección en construcción",
+                 font=("Segoe UI", 14, "bold"), bg=C["bg"], fg=C["muted"]).pack(pady=(60, 4))
+        tk.Label(frame, text=f"(\"{sid}\" se conecta en el siguiente bloque)",
+                 font=FONT, bg=C["bg"], fg=C["muted"]).pack()
+
+    # ---------------- Contenido de cada sección (dentro del dock) ----------------
+
+    def _crear_shell_tab(self, sid, nombre_seccion, columnas):
+        """Crea el contenido comun de una seccion (titulo + card + treeview
+        + scrollbar) DENTRO del frame que el dock ya creo para esa seccion."""
+        outer = self.secciones[sid]
+
+        titulo_var = tk.StringVar(value=nombre_seccion)
+        self.titulo_vars[sid] = titulo_var
+        tk.Label(outer, textvariable=titulo_var, font=("Segoe UI", 15, "bold"),
+                 bg=C["bg"], fg=C["primary"]).pack(anchor="w", pady=(0, 8))
 
         card = tk.Frame(outer, bg=C["card"], highlightbackground="#d8dde3", highlightthickness=1)
-        card.pack(fill="both", expand=True, padx=4, pady=4)
+        card.pack(fill="both", expand=True)
 
         tree_frame = tk.Frame(card, bg=C["card"])
         tree_frame.pack(fill="both", expand=True, padx=12, pady=(12, 6))
@@ -344,26 +478,46 @@ class PitaApp(tk.Tk):
         vsb.pack(side="right", fill="y")
 
         btn_frame = tk.Frame(card, bg=C["card"])
-        btn_frame.pack(fill="x", padx=12, pady=(0, 12))
+        btn_frame.pack(fill="x", padx=12, pady=(4, 12))
 
-        return outer, tree, btn_frame
+        return tree, btn_frame
 
     def _fila_activo(self, activo):
         return "Activo" if activo else "Inactivo"
 
+    # Helper: crea un tk.Button bien estilizado (sin los problemas de recorte
+    # que tiene ttk.Button en Windows al redimensionar la ventana).
+    # estilo: "normal" | "accent" | "danger" | "nav" (para botones ← Volver)
+    def _btn(self, parent, texto, comando, estilo="normal", lado="left"):
+        colores = {
+            "normal":  dict(bg="#e5e7eb", fg="#374151", abg="#d1d5db", afg="#111827"),
+            "accent":  dict(bg=C["primary"], fg="white",   abg=C["primary_dark"], afg="white"),
+            "danger":  dict(bg=C["danger"],  fg="white",   abg=C["danger_dark"],  afg="white"),
+            "nav":     dict(bg="#d1d5db",    fg="#374151", abg="#b0b7c3",         afg="#111827"),
+        }
+        c = colores.get(estilo, colores["normal"])
+        b = tk.Button(
+            parent, text=texto, command=comando,
+            font=FONT_BOLD if estilo in ("accent", "danger") else FONT,
+            bg=c["bg"], fg=c["fg"],
+            activebackground=c["abg"], activeforeground=c["afg"],
+            relief="flat", bd=0, cursor="hand2",
+            padx=10, pady=5,
+        )
+        b.pack(side=lado, padx=4, pady=2)
+        return b
+
     # ---------------- FACULTADES ----------------
 
     def _tab_facultades(self):
-        self.tab_facultades, self.tree_facultades, btns = self._crear_shell_tab(
-            "Facultades", ["Código", "Nombre", "Decano", "Estado"])
+        self.tree_facultades, btns = self._crear_shell_tab(
+            "facultades", "Facultades", ["Código", "Nombre", "Decano", "Estado"])
 
-        ttk.Button(btns, text="Nueva", style="Accent.TButton",
-                   command=self._facultad_nueva).pack(side="left", padx=4)
-        ttk.Button(btns, text="Editar", command=self._facultad_editar).pack(side="left", padx=4)
-        ttk.Button(btns, text="Activar/Desactivar", command=self._facultad_toggle).pack(side="left", padx=4)
-        ttk.Button(btns, text="Eliminar", style="Danger.TButton",
-                   command=self._facultad_eliminar).pack(side="left", padx=4)
-        ttk.Button(btns, text="Ver programas", command=self._ir_a_programas_filtrados).pack(side="left", padx=4)
+        self._btn(btns, "Nueva",             self._facultad_nueva,    estilo="accent")
+        self._btn(btns, "Editar",            self._facultad_editar)
+        self._btn(btns, "Activar/Desactivar",self._facultad_toggle)
+        self._btn(btns, "Eliminar",          self._facultad_eliminar, estilo="danger")
+        self._btn(btns, "Ver programas",     self._ir_a_programas_filtrados)
 
         self.tree_facultades.bind("<Double-1>", self._doble_click_facultad)
         self._refrescar_facultades()
@@ -436,19 +590,17 @@ class PitaApp(tk.Tk):
     # ---------------- PROGRAMAS ----------------
 
     def _tab_programas(self):
-        self.tab_programas, self.tree_programas, btns = self._crear_shell_tab(
-            "Programas", ["Código", "Nombre", "Nivel", "Facultad", "Estado"])
+        self.tree_programas, btns = self._crear_shell_tab(
+            "programas", "Programas", ["Código", "Nombre", "Nivel", "Facultad", "Estado"])
 
-        ttk.Button(btns, text="Nuevo", style="Accent.TButton",
-                   command=self._programa_nuevo).pack(side="left", padx=4)
-        ttk.Button(btns, text="Editar", command=self._programa_editar).pack(side="left", padx=4)
-        ttk.Button(btns, text="Activar/Desactivar", command=self._programa_toggle).pack(side="left", padx=4)
-        ttk.Button(btns, text="Eliminar", style="Danger.TButton",
-                   command=self._programa_eliminar).pack(side="left", padx=4)
-        ttk.Button(btns, text="Ver cursos", command=self._ir_a_cursos_filtrados).pack(side="left", padx=4)
-        ttk.Button(btns, text="Ver estudiantes", command=self._ir_a_estudiantes_programa).pack(side="left", padx=4)
-        ttk.Button(btns, text="Mostrar todos", command=self._mostrar_todos_programas).pack(side="left", padx=4)
-        ttk.Button(btns, text="← Facultades", command=self._volver_a_facultades).pack(side="right", padx=4)
+        self._btn(btns, "Nuevo",              self._programa_nuevo,              estilo="accent")
+        self._btn(btns, "Editar",             self._programa_editar)
+        self._btn(btns, "Activar/Desactivar", self._programa_toggle)
+        self._btn(btns, "Eliminar",           self._programa_eliminar,           estilo="danger")
+        self._btn(btns, "Ver cursos",         self._ir_a_cursos_filtrados)
+        self._btn(btns, "Ver estudiantes",    self._ir_a_estudiantes_programa)
+        self._btn(btns, "Mostrar todos",      self._mostrar_todos_programas)
+        self._btn(btns, "← Facultades",      self._volver_a_facultades,         estilo="nav", lado="right")
 
         self.tree_programas.bind("<Double-1>", self._doble_click_programa)
         self._refrescar_programas()
@@ -483,13 +635,13 @@ class PitaApp(tk.Tk):
         self.filtro_facultad_programas = f.codigo
         self.filtro_programa_cursos = None
         self._refrescar_programas()
-        self.notebook.select(self.tab_programas)
+        self._mostrar_seccion("programas")
         self._set_status(f"Mostrando programas de la facultad: {f.nombre} ({f.codigo}).")
 
     def _mostrar_todos_programas(self):
         self.filtro_facultad_programas = None
         self._refrescar_programas()
-        self.notebook.select(self.tab_programas)
+        self._mostrar_seccion("programas")
         self._set_status("Mostrando todos los programas.")
 
     def _ir_a_cursos_filtrados(self):
@@ -498,13 +650,13 @@ class PitaApp(tk.Tk):
             return
         self.filtro_programa_cursos = p.codigo
         self._refrescar_cursos()
-        self.notebook.select(self.tab_cursos)
+        self._mostrar_seccion("cursos")
         self._set_status(f"Mostrando cursos del programa: {p.nombre} ({p.codigo}).")
 
     def _mostrar_todos_cursos(self):
         self.filtro_programa_cursos = None
         self._refrescar_cursos()
-        self.notebook.select(self.tab_cursos)
+        self._mostrar_seccion("cursos")
         self._set_status("Mostrando todos los cursos.")
 
     def _ir_a_estudiantes_programa(self):
@@ -514,7 +666,7 @@ class PitaApp(tk.Tk):
         self.filtro_programa_estudiantes = p.codigo
         self.filtro_curso_estudiantes = None
         self._refrescar_estudiantes()
-        self.notebook.select(self.tab_estudiantes)
+        self._mostrar_seccion("estudiantes")
         self._set_status(f"Mostrando estudiantes del programa: {p.nombre} ({p.codigo}).")
 
     def _ir_a_estudiantes_curso(self):
@@ -524,48 +676,48 @@ class PitaApp(tk.Tk):
         self.filtro_curso_estudiantes = c.codigo
         self.filtro_programa_estudiantes = None
         self._refrescar_estudiantes()
-        self.notebook.select(self.tab_estudiantes)
+        self._mostrar_seccion("estudiantes")
         self._set_status(f"Mostrando estudiantes matriculados en: {c.nombre} ({c.codigo}).")
 
     def _mostrar_todos_estudiantes(self):
         self.filtro_programa_estudiantes = None
         self.filtro_curso_estudiantes = None
         self._refrescar_estudiantes()
-        self.notebook.select(self.tab_estudiantes)
+        self._mostrar_seccion("estudiantes")
         self._set_status("Mostrando todos los estudiantes.")
 
     def _volver_a_facultades(self):
-        self.notebook.select(self.tab_facultades)
+        self._mostrar_seccion("facultades")
         self._set_status("Selecciona una facultad para consultar sus programas.")
 
     def _volver_a_programas(self):
         self.filtro_programa_cursos = None
         self._refrescar_programas()
-        self.notebook.select(self.tab_programas)
+        self._mostrar_seccion("programas")
         self._set_status("Selecciona un programa para consultar sus cursos.")
 
     def _actualizar_titulo_programas(self):
-        if self.notebook is None or self.tab_programas is None:
+        if "programas" not in self.titulo_vars:
             return
         if self.filtro_facultad_programas:
             f = buscar_facultad(self.facultades, self.filtro_facultad_programas)
             texto = f"Programas — {f.codigo}" if f else "Programas"
         else:
             texto = "Programas"
-        self.notebook.tab(self.tab_programas, text=texto)
+        self.titulo_vars["programas"].set(texto)
 
     def _actualizar_titulo_cursos(self):
-        if self.notebook is None or self.tab_cursos is None:
+        if "cursos" not in self.titulo_vars:
             return
         if self.filtro_programa_cursos:
             p = buscar_programa(self.programas, self.filtro_programa_cursos)
             texto = f"Cursos — {p.codigo}" if p else "Cursos"
         else:
             texto = "Cursos"
-        self.notebook.tab(self.tab_cursos, text=texto)
+        self.titulo_vars["cursos"].set(texto)
 
     def _actualizar_titulo_estudiantes(self):
-        if self.notebook is None or self.tab_estudiantes is None:
+        if "estudiantes" not in self.titulo_vars:
             return
         if self.filtro_curso_estudiantes:
             c = buscar_curso(self.cursos, self.filtro_curso_estudiantes)
@@ -575,7 +727,7 @@ class PitaApp(tk.Tk):
             texto = f"Estudiantes — {p.codigo}" if p else "Estudiantes"
         else:
             texto = "Estudiantes"
-        self.notebook.tab(self.tab_estudiantes, text=texto)
+        self.titulo_vars["estudiantes"].set(texto)
 
     def _programa_seleccionado(self):
         sel = self.tree_programas.selection()
@@ -652,20 +804,18 @@ class PitaApp(tk.Tk):
     # ---------------- CURSOS ----------------
 
     def _tab_cursos(self):
-        self.tab_cursos, self.tree_cursos, btns = self._crear_shell_tab(
-            "Cursos", ["Código", "Nombre", "Créditos", "Programa", "Profesor", "Estado"])
+        self.tree_cursos, btns = self._crear_shell_tab(
+            "cursos", "Cursos", ["Código", "Nombre", "Créditos", "Programa", "Profesor", "Estado"])
 
-        ttk.Button(btns, text="Nuevo", style="Accent.TButton",
-                   command=self._curso_nuevo).pack(side="left", padx=4)
-        ttk.Button(btns, text="Editar", command=self._curso_editar).pack(side="left", padx=4)
-        ttk.Button(btns, text="Activar/Desactivar", command=self._curso_toggle).pack(side="left", padx=4)
-        ttk.Button(btns, text="Eliminar", style="Danger.TButton",
-                   command=self._curso_eliminar).pack(side="left", padx=4)
-        ttk.Button(btns, text="Ver detalle", command=self._curso_ver_detalle).pack(side="left", padx=4)
-        ttk.Button(btns, text="Ver profesor", command=self._curso_ver_profesor).pack(side="left", padx=4)
-        ttk.Button(btns, text="Ver estudiantes", command=self._ir_a_estudiantes_curso).pack(side="left", padx=4)
-        ttk.Button(btns, text="Mostrar todos", command=self._mostrar_todos_cursos).pack(side="left", padx=4)
-        ttk.Button(btns, text="← Programas", command=self._volver_a_programas).pack(side="right", padx=4)
+        self._btn(btns, "Nuevo",              self._curso_nuevo,              estilo="accent")
+        self._btn(btns, "Editar",             self._curso_editar)
+        self._btn(btns, "Activar/Desactivar", self._curso_toggle)
+        self._btn(btns, "Eliminar",           self._curso_eliminar,           estilo="danger")
+        self._btn(btns, "Ver detalle",        self._curso_ver_detalle)
+        self._btn(btns, "Ver profesor",       self._curso_ver_profesor)
+        self._btn(btns, "Ver estudiantes",    self._ir_a_estudiantes_curso)
+        self._btn(btns, "Mostrar todos",      self._mostrar_todos_cursos)
+        self._btn(btns, "← Programas",       self._volver_a_programas,       estilo="nav", lado="right")
 
         self.tree_cursos.bind("<Double-1>", self._doble_click_curso)
         self._refrescar_cursos()
@@ -779,19 +929,17 @@ class PitaApp(tk.Tk):
     # ---------------- ESTUDIANTES ----------------
 
     def _tab_estudiantes(self):
-        self.tab_estudiantes, self.tree_estudiantes, btns = self._crear_shell_tab(
-            "Estudiantes", ["ID", "Nombre", "Programa", "Estado", "Promedio", "EBRA"])
+        self.tree_estudiantes, btns = self._crear_shell_tab(
+            "estudiantes", "Estudiantes", ["ID", "Nombre", "Programa", "Estado", "Promedio", "EBRA"])
 
-        ttk.Button(btns, text="Nuevo", style="Accent.TButton",
-                   command=self._estudiante_nuevo).pack(side="left", padx=4)
-        ttk.Button(btns, text="Editar", command=self._estudiante_editar).pack(side="left", padx=4)
-        ttk.Button(btns, text="Matricular curso", command=self._estudiante_matricular).pack(side="left", padx=4)
-        ttk.Button(btns, text="Cancelar curso", command=self._estudiante_cancelar_curso).pack(side="left", padx=4)
-        ttk.Button(btns, text="Ver ficha", command=self._estudiante_ver_ficha).pack(side="left", padx=4)
-        ttk.Button(btns, text="Mostrar todos", command=self._mostrar_todos_estudiantes).pack(side="left", padx=4)
-        ttk.Button(btns, text="Activar/Desactivar", command=self._estudiante_toggle).pack(side="left", padx=4)
-        ttk.Button(btns, text="Eliminar", style="Danger.TButton",
-                   command=self._estudiante_eliminar).pack(side="left", padx=4)
+        self._btn(btns, "Nuevo",              self._estudiante_nuevo,           estilo="accent")
+        self._btn(btns, "Editar",             self._estudiante_editar)
+        self._btn(btns, "Matricular curso",   self._estudiante_matricular)
+        self._btn(btns, "Cancelar curso",     self._estudiante_cancelar_curso)
+        self._btn(btns, "Ver ficha",          self._estudiante_ver_ficha)
+        self._btn(btns, "Mostrar todos",      self._mostrar_todos_estudiantes)
+        self._btn(btns, "Activar/Desactivar", self._estudiante_toggle)
+        self._btn(btns, "Eliminar",           self._estudiante_eliminar,        estilo="danger")
 
         self.tree_estudiantes.bind("<Double-1>", self._doble_click_estudiante)
         self._refrescar_estudiantes()
@@ -890,12 +1038,15 @@ class PitaApp(tk.Tk):
         e = self._estudiante_seleccionado()
         if not e:
             return
-        if not self.cursos:
-            messagebox.showwarning("Sin cursos", "No hay cursos registrados.")
-            return
-        opciones_curso = [c.codigo for c in self.cursos if c.activo]
+        ya_matriculados = {m["codigo_curso"] for m in e.matriculas}
+        # Filtro basico: solo cursos ACTIVOS del MISMO PROGRAMA del estudiante,
+        # y que aun no tenga matriculados.
+        opciones_curso = [c.codigo for c in self.cursos
+                          if c.activo and c.codigo_programa == e.codigo_programa
+                          and c.codigo not in ya_matriculados]
         if not opciones_curso:
-            messagebox.showwarning("Sin cursos activos", "No hay cursos activos disponibles.")
+            messagebox.showwarning("Sin cursos disponibles",
+                f"No hay cursos activos del programa {e.codigo_programa} pendientes por matricular.")
             return
         campos = [
             {"label": "Curso", "key": "codigo_curso", "tipo": "combo", "opciones": opciones_curso},
@@ -942,16 +1093,14 @@ class PitaApp(tk.Tk):
     # ---------------- PROFESORES ----------------
 
     def _tab_profesores(self):
-        _, self.tree_profesores, btns = self._crear_shell_tab(
-            "Profesores", ["ID", "Nombre", "Vinculación", "Dedicación", "Categoría", "Programa", "Estado"])
+        self.tree_profesores, btns = self._crear_shell_tab(
+            "profesores", "Profesores", ["ID", "Nombre", "Vinculación", "Dedicación", "Categoría", "Programa", "Estado"])
 
-        ttk.Button(btns, text="Nuevo", style="Accent.TButton",
-                   command=self._profesor_nuevo).pack(side="left", padx=4)
-        ttk.Button(btns, text="Editar", command=self._profesor_editar).pack(side="left", padx=4)
-        ttk.Button(btns, text="Ver nómina", command=self._profesor_ver_nomina).pack(side="left", padx=4)
-        ttk.Button(btns, text="Activar/Desactivar", command=self._profesor_toggle).pack(side="left", padx=4)
-        ttk.Button(btns, text="Eliminar", style="Danger.TButton",
-                   command=self._profesor_eliminar).pack(side="left", padx=4)
+        self._btn(btns, "Nuevo",              self._profesor_nuevo,    estilo="accent")
+        self._btn(btns, "Editar",             self._profesor_editar)
+        self._btn(btns, "Ver nómina",         self._profesor_ver_nomina)
+        self._btn(btns, "Activar/Desactivar", self._profesor_toggle)
+        self._btn(btns, "Eliminar",           self._profesor_eliminar, estilo="danger")
 
         self._refrescar_profesores()
 
@@ -1027,6 +1176,16 @@ class PitaApp(tk.Tk):
             {"label": "Identificación", "key": "identificacion", "tipo": "entry",
              "valor": p.identificacion, "readonly": True},
             {"label": "Nombre completo", "key": "nombre", "tipo": "entry", "valor": p.nombre_completo},
+            {"label": "Tipo de vinculación", "key": "tipo_vinculacion", "tipo": "combo",
+             "opciones": ["Planta", "Ocasional", "Catedratico"], "valor": p.tipo_vinculacion},
+            {"label": "Dedicación", "key": "dedicacion", "tipo": "combo",
+             "opciones": ["TiempoCompleto", "MedioTiempo", "HorasCatedra"], "valor": p.dedicacion},
+            {"label": "Categoría escalafón (vacío si Catedrático)", "key": "categoria_escalafon", "tipo": "combo",
+             "opciones": ["", "Auxiliar", "Asistente", "Asociado", "Titular"], "valor": p.categoria_escalafon},
+            {"label": "Horas cátedra semanales (máx. 18)", "key": "horas_catedra", "tipo": "entry",
+             "valor": str(p.horas_catedra_semanales)},
+            {"label": "Ad-honorem (sin remuneración)", "key": "ad_honorem", "tipo": "check",
+             "valor": p.ad_honorem},
             {"label": "Años de experiencia", "key": "anios_experiencia", "tipo": "entry",
              "valor": str(p.anios_experiencia)},
             {"label": "Puntos por títulos", "key": "puntos_titulos", "tipo": "entry",
@@ -1035,13 +1194,25 @@ class PitaApp(tk.Tk):
              "valor": str(p.puntos_productividad)},
         ]
         def guardar(v):
-            p.nombre_completo = v["nombre"].strip() or p.nombre_completo
+            if v["tipo_vinculacion"] == "Catedratico":
+                try:
+                    horas = int(v["horas_catedra"])
+                except ValueError:
+                    return "Las horas de cátedra deben ser un número entero."
+                if horas > 18:
+                    return "El Acuerdo 027 de 2024 limita a 18 horas semanales para catedráticos."
             try:
                 p.anios_experiencia = int(v["anios_experiencia"])
                 p.puntos_titulos = int(v["puntos_titulos"])
                 p.puntos_productividad = int(v["puntos_productividad"])
+                p.horas_catedra_semanales = int(v["horas_catedra"] or 0)
             except ValueError:
                 return "Los campos numéricos deben ser números enteros."
+            p.nombre_completo = v["nombre"].strip() or p.nombre_completo
+            p.tipo_vinculacion = v["tipo_vinculacion"]
+            p.dedicacion = v["dedicacion"]
+            p.categoria_escalafon = v["categoria_escalafon"]
+            p.ad_honorem = bool(v["ad_honorem"])
             self._refrescar_profesores()
             self._set_status(f"Profesor {p.identificacion} modificado.")
             return None
@@ -1073,17 +1244,22 @@ class PitaApp(tk.Tk):
     # ---------------- ADMINISTRATIVOS ----------------
 
     def _tab_administrativos(self):
-        _, self.tree_admins, btns = self._crear_shell_tab(
-            "Administrativos", ["ID", "Nombre", "Cargo", "Contratación", "Facultad", "Salario", "Estado"])
+        self.tree_admins, btns = self._crear_shell_tab(
+            "administrativos", "Administrativos", ["ID", "Nombre", "Cargo", "Contratación", "Facultad", "Salario", "Estado"])
 
-        ttk.Button(btns, text="Nuevo", style="Accent.TButton",
-                   command=self._admin_nuevo).pack(side="left", padx=4)
-        ttk.Button(btns, text="Editar", command=self._admin_editar).pack(side="left", padx=4)
-        ttk.Button(btns, text="Activar/Desactivar", command=self._admin_toggle).pack(side="left", padx=4)
-        ttk.Button(btns, text="Eliminar", style="Danger.TButton",
-                   command=self._admin_eliminar).pack(side="left", padx=4)
+        self._btn(btns, "Nuevo",              self._admin_nuevo,    estilo="accent")
+        self._btn(btns, "Editar",             self._admin_editar)
+        self._btn(btns, "Ver salario",        self._admin_ver_salario)
+        self._btn(btns, "Activar/Desactivar", self._admin_toggle)
+        self._btn(btns, "Eliminar",           self._admin_eliminar, estilo="danger")
 
         self._refrescar_administrativos()
+
+    def _admin_ver_salario(self):
+        a = self._admin_seleccionado()
+        if not a:
+            return
+        VentanaSalarioAdmin(self, a)
 
     def _refrescar_administrativos(self):
         self.tree_admins.delete(*self.tree_admins.get_children())
@@ -1102,14 +1278,15 @@ class PitaApp(tk.Tk):
 
     def _admin_nuevo(self):
         opciones_facultad = [""] + [f.codigo for f in self.facultades]
+        niveles = ["Nivel 1", "Nivel 2", "Nivel 3", "Nivel 4"]
         campos = [
             {"label": "Identificación", "key": "identificacion", "tipo": "entry"},
             {"label": "Nombre completo", "key": "nombre", "tipo": "entry"},
             {"label": "Cargo", "key": "cargo", "tipo": "entry"},
-            {"label": "Categoría", "key": "categoria", "tipo": "entry", "valor": "Nivel 1"},
+            {"label": "Categoría (Escala Salarial)", "key": "categoria", "tipo": "combo", "opciones": niveles},
             {"label": "Tipo de contratación", "key": "tipo_contratacion", "tipo": "combo",
              "opciones": ["Planta", "Provisional", "Contrato"]},
-            {"label": "Salario base", "key": "salario_base", "tipo": "entry", "valor": "0"},
+            {"label": "Salario base (0 = según escala)", "key": "salario_base", "tipo": "entry", "valor": "0"},
             {"label": "Facultad (vacío = nivel central)", "key": "codigo_facultad", "tipo": "combo",
              "opciones": opciones_facultad},
         ]
@@ -1124,6 +1301,8 @@ class PitaApp(tk.Tk):
                 salario = float(v["salario_base"])
             except ValueError:
                 return "El salario debe ser un número."
+            if salario <= 0:
+                salario = salario_base_administrativo(v["categoria"])
             self.administrativos.append(Administrativo(
                 v["identificacion"].strip(), v["nombre"].strip(), v["cargo"].strip(),
                 v["categoria"].strip(), v["tipo_contratacion"], salario,
@@ -1138,18 +1317,28 @@ class PitaApp(tk.Tk):
         a = self._admin_seleccionado()
         if not a:
             return
+        niveles = ["Nivel 1", "Nivel 2", "Nivel 3", "Nivel 4"]
         campos = [
             {"label": "Identificación", "key": "identificacion", "tipo": "entry",
              "valor": a.identificacion, "readonly": True},
             {"label": "Nombre completo", "key": "nombre", "tipo": "entry", "valor": a.nombre_completo},
             {"label": "Cargo", "key": "cargo", "tipo": "entry", "valor": a.cargo},
-            {"label": "Salario base", "key": "salario_base", "tipo": "entry", "valor": str(a.salario_base)},
+            {"label": "Categoría (Escala Salarial)", "key": "categoria", "tipo": "combo",
+             "opciones": niveles, "valor": a.categoria if a.categoria in niveles else "Nivel 1"},
+            {"label": "Tipo de contratación", "key": "tipo_contratacion", "tipo": "combo",
+             "opciones": ["Planta", "Provisional", "Contrato"], "valor": a.tipo_contratacion},
+            {"label": "Salario base", "key": "salario_base", "tipo": "entry", "valor": str(int(a.salario_base))},
         ]
         def guardar(v):
             a.nombre_completo = v["nombre"].strip() or a.nombre_completo
             a.cargo = v["cargo"].strip() or a.cargo
+            a.categoria = v["categoria"]
+            a.tipo_contratacion = v["tipo_contratacion"]
             try:
-                a.salario_base = float(v["salario_base"])
+                salario = float(v["salario_base"])
+                if salario <= 0:
+                    salario = salario_base_administrativo(a.categoria)
+                a.salario_base = salario
             except ValueError:
                 return "El salario debe ser un número."
             self._refrescar_administrativos()
@@ -1213,6 +1402,38 @@ class PitaApp(tk.Tk):
         if messagebox.askyesno("Guardar antes de salir", "¿Deseas guardar los datos antes de salir?"):
             self._guardar_datos()
         self.destroy()
+
+    # ---------------- NÓMINA DOCENTE (solo consulta, sin CRUD) ----------------
+    # Separada de "Profesores" a proposito: aqui NO se crea/edita/elimina
+    # nada, solo se consulta el desglose de salario ya calculado.
+
+    def _tab_nomina(self):
+        self.tree_nomina, btns = self._crear_shell_tab(
+            "nomina", "Nómina Docente", ["ID", "Nombre", "Vinculación", "Dedicación", "Programa"])
+
+        self._btn(btns, "Ver nómina", self._nomina_ver_seleccionado, estilo="accent")
+        tk.Label(btns, text="Solo consulta — para editar datos del profesor, usa la sección Profesores.",
+                 font=("Segoe UI", 9, "italic"), bg=C["card"], fg=C["muted"]).pack(side="left", padx=12)
+
+        self.tree_nomina.bind("<Double-1>", lambda e: self._nomina_ver_seleccionado())
+        self.refrescos_seccion["nomina"] = self._refrescar_nomina
+        self._refrescar_nomina()
+
+    def _refrescar_nomina(self):
+        self.tree_nomina.delete(*self.tree_nomina.get_children())
+        for p in self.profesores:
+            self.tree_nomina.insert("", "end", iid=p.identificacion,
+                values=(p.identificacion, p.nombre_completo, p.tipo_vinculacion,
+                        p.dedicacion, p.codigo_programa))
+
+    def _nomina_ver_seleccionado(self):
+        sel = self.tree_nomina.selection()
+        if not sel:
+            messagebox.showinfo("Selección requerida", "Selecciona un profesor de la lista.")
+            return
+        p = buscar_profesor(self.profesores, sel[0])
+        if p:
+            VentanaNomina(self, p)
 
 
 class VentanaEstudiante(tk.Toplevel):
@@ -1365,112 +1586,450 @@ class VentanaCursoDetalle(tk.Toplevel):
 
 
 class VentanaNomina(tk.Toplevel):
-    """Desglose de nómina distinguiendo el régimen real de vinculación."""
+    """Desprendible Oficial de Pago de Nómina (formato institucional auditable UPC)."""
     def __init__(self, parent, profesor):
         super().__init__(parent)
-        self.title(f"Nómina — {profesor.nombre_completo}")
-        self.configure(bg=C["card"])
-        self.resizable(False, False)
-        self.geometry("540x590")
+        self.title(f"Desprendible de Liquidación - {profesor.nombre_completo}")
+        self.configure(bg="#eef2f6")
+        self.resizable(True, True)
+        self.geometry("640x860")
+        self.minsize(580, 720)
+        self.periodo = "mensual"
 
-        tk.Label(self, text=profesor.nombre_completo, font=("Segoe UI", 14, "bold"),
-                 bg=C["card"], fg=C["primary"]).pack(anchor="w", padx=18, pady=(16, 2))
-        tk.Label(self, text=f"{profesor.tipo_vinculacion} · {profesor.dedicacion}",
-                 font=FONT, bg=C["card"], fg=C["muted"]).pack(anchor="w", padx=18)
-        tk.Label(self, text=f"Régimen: {regimen_nomina(profesor)}",
-                 font=("Segoe UI", 9, "italic"), bg=C["card"], fg=C["muted"]).pack(
-                     anchor="w", padx=18, pady=(2, 12))
+        # ── Scrollable content ─────────────────────────────────────────────
+        canvas = tk.Canvas(self, bg="#eef2f6", highlightthickness=0)
+        vsb = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
 
-        filas = tk.Frame(self, bg=C["card"])
-        filas.pack(fill="x", padx=18)
+        inner = tk.Frame(canvas, bg="#eef2f6")
+        canvas_window = canvas.create_window((0, 0), window=inner, anchor="nw")
 
-        def fila(label, valor, bold=False, color=None):
-            f = tk.Frame(filas, bg=C["card"])
-            f.pack(fill="x", pady=3)
-            tk.Label(f, text=label, font=FONT_BOLD if bold else FONT, bg=C["card"],
-                     fg=color or "#1a1a1a").pack(side="left")
-            tk.Label(f, text=valor, font=FONT_BOLD if bold else FONT, bg=C["card"],
-                     fg=color or "#1a1a1a").pack(side="right")
+        def _on_inner_configure(e):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        def _on_canvas_configure(e):
+            canvas.itemconfig(canvas_window, width=e.width)
+
+        inner.bind("<Configure>", _on_inner_configure)
+        canvas.bind("<Configure>", _on_canvas_configure)
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(
+            int(-1 * (e.delta / 120)), "units"))
+
+        # ── Encabezado Oficial ─────────────────────────────────────────────
+        card_header = tk.Frame(inner, bg="white", highlightbackground="#dce2ea", highlightthickness=1)
+        card_header.pack(fill="x", padx=20, pady=(16, 12))
+
+        top_h = tk.Frame(card_header, bg="white")
+        top_h.pack(fill="x", padx=16, pady=(14, 4))
+        tk.Label(top_h, text="🗎  Desprendible Oficial de Pago de Nómina",
+                 font=("Segoe UI", 13, "bold"), bg="white", fg="#111827").pack(side="left")
+        self.btn_periodo = ttk.Button(top_h, text="Ver anual", command=self._alternar_periodo)
+        self.btn_periodo.pack(side="right")
+
+        # Modalidad / Nro Liquidación
+        liq_num = abs(hash(profesor.identificacion)) % 900 + 100
+        sub_info = f"Docente: {profesor.nombre_completo}  |  Modalidad: {profesor.tipo_vinculacion.upper()}  |  Liquidación N° {liq_num}"
+        tk.Label(card_header, text=sub_info, font=("Segoe UI", 9), bg="white", fg="#6b7280").pack(anchor="w", padx=16, pady=(0, 4))
+
+        self.lbl_periodo_fechas = tk.Label(card_header, text="🗓 Período Liquidado: Marzo 2026  ·  01/03/2026 - 31/03/2026",
+                                           font=("Segoe UI", 9, "bold"), bg="white", fg="#1d4ed8")
+        self.lbl_periodo_fechas.pack(anchor="w", padx=16, pady=(0, 14))
 
         bruto = calcular_salario_bruto(profesor)
         disponible = liquidacion_disponible(profesor)
 
-        if profesor.tipo_vinculacion == "Planta":
-            puntos_cat = puntos_por_categoria(profesor.categoria_escalafon)
-            fila("Puntos título profesional:", str(PUNTOS_PREGRADO))
-            fila("Categoría escalafón:", f"{profesor.categoria_escalafon or '—'} ({puntos_cat} pts)")
-            fila("Puntos títulos adicionales:", str(profesor.puntos_titulos))
-            fila("Puntos productividad:", str(profesor.puntos_productividad))
-            fila("Total usado por PITA:", str(total_puntos(profesor)), bold=True)
-            fila("Valor del punto 2026:", f"${VALOR_PUNTO:,.0f}")
-            fila("Factor dedicación:", f"{factor_proporcionalidad(profesor):.2f}")
-        elif profesor.tipo_vinculacion == "Ocasional":
-            factor = factor_ocasional(profesor)
-            fila("Categoría:", profesor.categoria_escalafon or "—")
-            fila("Dedicación:", profesor.dedicacion)
-            fila("Factor Acuerdo 027:", f"{factor:.3f} SMMLV" if factor is not None else "No definido")
-            fila("SMMLV 2026:", f"${SMMLV:,.0f}")
-            fila("Bonif. posgrado/investigación:", "No calculadas")
-        elif profesor.tipo_vinculacion == "Catedratico":
-            fila("Horas cátedra semanales:", str(profesor.horas_catedra_semanales))
-            fila("Límite reglamentario:", "Hasta 18 h/semana")
-            fila("Valor hora rectoral 2026:",
-                 f"${VALOR_HORA_CATEDRA:,.0f}" if VALOR_HORA_CATEDRA is not None else "No configurado")
-            fila("Liquidación:", "Pendiente resolución rectoral" if not disponible else "Disponible")
-        else:
-            fila("Régimen:", "No definido")
-
-        tk.Frame(self, bg="#d8dde3", height=1).pack(fill="x", padx=18, pady=10)
-
-        if disponible:
-            salud = calcular_descuento_salud(bruto)
-            pension = calcular_descuento_pension(bruto)
-            neto = calcular_salario_neto(profesor)
-            filas2 = tk.Frame(self, bg=C["card"])
-            filas2.pack(fill="x", padx=18)
-
-            def fila2(label, valor, bold=False):
-                f = tk.Frame(filas2, bg=C["card"])
-                f.pack(fill="x", pady=3)
-                tk.Label(f, text=label, font=FONT_BOLD if bold else FONT, bg=C["card"]).pack(side="left")
-                tk.Label(f, text=valor, font=FONT_BOLD if bold else FONT, bg=C["card"]).pack(side="right")
-
-            fila2("Salario bruto:", f"${bruto:,.2f}", bold=True)
-            fila2("(-) Salud (4%):", f"${salud:,.2f}")
-            fila2("(-) Pensión (4%):", f"${pension:,.2f}")
-
-            neto_frame = tk.Frame(self, bg=C["ok_bg"] if neto > 0 else C["warn_bg"])
-            neto_frame.pack(fill="x", padx=18, pady=12)
-            tk.Label(neto_frame, text="SALARIO NETO ESTIMADO", font=FONT_BOLD,
-                     bg=neto_frame["bg"], fg=C["ok_fg"] if neto > 0 else C["warn_fg"]).pack(
-                         side="left", padx=10, pady=8)
-            tk.Label(neto_frame, text=f"${neto:,.2f}", font=("Segoe UI", 13, "bold"),
-                     bg=neto_frame["bg"], fg=C["ok_fg"] if neto > 0 else C["warn_fg"]).pack(
-                         side="right", padx=10, pady=8)
-
-            if profesor.tipo_vinculacion == "Planta":
-                prima = calcular_prima_servicios(bruto)
-                cesantias = calcular_cesantias(bruto)
-                tk.Label(self, text=f"Provisión mensual prima de servicios: ${prima:,.2f}",
-                         font=("Segoe UI", 9), bg=C["card"], fg=C["muted"]).pack(anchor="w", padx=18)
-                tk.Label(self, text=f"Provisión mensual cesantías: ${cesantias:,.2f}",
-                         font=("Segoe UI", 9), bg=C["card"], fg=C["muted"]).pack(anchor="w", padx=18)
-        else:
-            aviso = tk.Frame(self, bg=C["warn_bg"])
-            aviso.pack(fill="x", padx=18, pady=8)
+        if not disponible:
+            self.btn_periodo.pack_forget()
+            aviso = tk.Frame(inner, bg=C["warn_bg"], highlightbackground="#fca5a5", highlightthickness=1)
+            aviso.pack(fill="x", padx=20, pady=8)
             tk.Label(aviso, text="NO SE LIQUIDA UN SALARIO INVENTADO",
-                     font=FONT_BOLD, bg=C["warn_bg"], fg=C["warn_fg"]).pack(padx=10, pady=(8, 2))
+                     font=FONT_BOLD, bg=C["warn_bg"], fg=C["warn_fg"]).pack(padx=14, pady=(10, 2))
             tk.Label(aviso, text="Falta el valor de hora cátedra fijado por resolución rectoral vigente.",
-                     font=("Segoe UI", 9), bg=C["warn_bg"], fg=C["warn_fg"], wraplength=470).pack(
-                         padx=10, pady=(0, 8))
+                     font=("Segoe UI", 9), bg=C["warn_bg"], fg=C["warn_fg"], wraplength=480).pack(padx=14, pady=(0, 10))
+            return
 
-        obs = observacion_normativa(profesor)
-        tk.Label(self, text=obs, font=("Segoe UI", 9, "italic"), bg=C["card"], fg=C["muted"],
-                 wraplength=495, justify="left").pack(fill="x", padx=18, pady=(12, 8))
+        # ── Cálculos ───────────────────────────────────────────────────────
+        salud_e   = calcular_descuento_salud(bruto)
+        pension_e = calcular_descuento_pension(bruto)
+        fsp_e     = calcular_descuento_fsp(bruto)
+        total_ded = salud_e + pension_e + fsp_e
+        neto      = bruto - total_ded
 
-        ttk.Button(self, text="Cerrar", command=self.destroy).pack(pady=(4, 14))
+        ap = calcular_aportes_patronales(bruto)
+        costo_upc = bruto + ap["total"]
+
+        # Helper para crear tarjetas
+        def crear_tarjeta(titulo, subtotal_txt="", color_titulo="#1f4e79"):
+            card = tk.Frame(inner, bg="white", highlightbackground="#dce2ea", highlightthickness=1)
+            card.pack(fill="x", padx=20, pady=(0, 12))
+
+            header_t = tk.Frame(card, bg="white")
+            header_t.pack(fill="x", padx=16, pady=(12, 8))
+            tk.Label(header_t, text=titulo, font=("Segoe UI", 10, "bold"),
+                     bg="white", fg=color_titulo).pack(side="left")
+            lbl_sub = None
+            if subtotal_txt:
+                lbl_sub = tk.Label(header_t, text=subtotal_txt, font=("Segoe UI", 10, "bold"),
+                                   bg="white", fg=color_titulo)
+                lbl_sub.pack(side="right")
+            return card, lbl_sub
+
+        def fila_card(parent, label, valor, bold=False, color="#111827"):
+            f = tk.Frame(parent, bg="white")
+            f.pack(fill="x", padx=16, pady=3)
+            tk.Label(f, text=label, font=FONT_BOLD if bold else FONT,
+                     bg="white", fg="#374151" if not bold else "#111827").pack(side="left")
+            lbl = tk.Label(f, text=valor, font=FONT_BOLD if bold else FONT,
+                           bg="white", fg=color)
+            lbl.pack(side="right")
+            return lbl
+
+        # 1. DEVENGADOS Y ASIGNACIONES (+)
+        card_dev, self.lbl_sub_dev = crear_tarjeta(
+            "DEVENGADOS Y ASIGNACIONES (+)", f"$ {bruto:,.0f} COP", color_titulo="#1d4ed8")
+        if profesor.tipo_vinculacion == "Planta":
+            pts = total_puntos(profesor)
+            desc_asig = f"Asignación Básica Mensual ({pts} pts × ${VALOR_PUNTO:,.0f})"
+        elif profesor.tipo_vinculacion == "Ocasional":
+            fact = factor_ocasional(profesor) or 0.0
+            desc_asig = f"Asignación Básica Mensual ({fact:.3f} SMMLV × ${SMMLV:,.0f})"
+        else:
+            desc_asig = "Asignación Básica Mensual"
+        self.lbl_asig_val = fila_card(card_dev, desc_asig, f"+ $ {bruto:,.0f} COP", bold=True, color="#1d4ed8")
+        tk.Frame(card_dev, bg="white", height=6).pack()
+
+        # 2. DEDUCCIONES OBLIGATORIAS DE LEY (-)
+        card_ded, self.lbl_sub_ded = crear_tarjeta(
+            "DEDUCCIONES OBLIGATORIAS DE LEY (-)", f"$ {total_ded:,.0f} COP", color_titulo="#dc2626")
+        self.lbl_ibc_ded = fila_card(card_ded, "IBC Seguridad Social (Base Cotización):", f"$ {bruto:,.0f} COP", bold=True)
+        tk.Frame(card_ded, bg="white", height=4).pack()
+        self.lbl_salud_val = fila_card(card_ded, "Aporte Salud Trabajador (4%)", f"- $ {salud_e:,} COP", color="#dc2626")
+        self.lbl_pension_val = fila_card(card_ded, "Aporte Pensión Trabajador (4%)", f"- $ {pension_e:,} COP", color="#dc2626")
+        self.lbl_fsp_val = fila_card(card_ded, "Fondo de Solidaridad Pensional (1%)", f"- $ {fsp_e:,} COP" if fsp_e > 0 else "$ 0 COP", color="#dc2626" if fsp_e > 0 else "#6b7280")
+        tk.Frame(card_ded, bg="white", height=6).pack()
+
+        # 3. COSTO TOTAL EMPLEADOR (UPC)
+        card_costo, self.lbl_sub_costo = crear_tarjeta(
+            "COSTO TOTAL EMPLEADOR (UPC)", f"$ {costo_upc:,.0f} COP", color_titulo="#d97706")
+        self.lbl_costo_asig = fila_card(card_costo, "Asignación Básica", f"$ {bruto:,.0f} COP", bold=True, color="#1d4ed8")
+        self.lbl_ap_salud = fila_card(card_costo, "Salud Patronal (8.5%)", f"$ {ap['salud']:,} COP", color="#4b5563")
+        self.lbl_ap_pension = fila_card(card_costo, "Pensión Patronal (12%)", f"$ {ap['pension']:,} COP", color="#4b5563")
+        self.lbl_ap_arl = fila_card(card_costo, "Aporte Riesgos Laborales (ARL)", f"$ {ap['arl']:,} COP", color="#4b5563")
+        self.lbl_ap_caja = fila_card(card_costo, "Caja de Compensación Familiar (4%)", f"$ {ap['caja']:,} COP", color="#4b5563")
+        tk.Frame(card_costo, bg="#f3f4f6", height=1).pack(fill="x", padx=16, pady=6)
+        self.lbl_costo_total_upc = fila_card(card_costo, "TOTAL COSTO UPC", f"$ {costo_upc:,.0f} COP", bold=True, color="#1d4ed8")
+        tk.Frame(card_costo, bg="white", height=6).pack()
+
+        # 4. INFORMACIÓN SALARIAL DOCENTE (DECRETO 1279 / ACUERDO 027)
+        reg_title = "INFORMACIÓN SALARIAL DOCENTE (DECRETO 1279)" if profesor.tipo_vinculacion == "Planta" else f"INFORMACIÓN SALARIAL ({regimen_nomina(profesor).upper()})"
+        card_info, _ = crear_tarjeta(reg_title, "", color_titulo="#2563eb")
+        if profesor.tipo_vinculacion == "Planta":
+            fila_card(card_info, "Categoría Docente:", (profesor.categoria_escalafon or "—").upper(), bold=True)
+            self.lbl_info_pts = fila_card(card_info, "Total Puntos Salariales:", f"{total_puntos(profesor)} pts", bold=True)
+            fila_card(card_info, "Valor Punto Salarial:", f"$ {VALOR_PUNTO:,.0f} COP", bold=True)
+            self.lbl_calc_asig = fila_card(card_info, "Cálculo Asignación Básica:", f"{total_puntos(profesor)} pts × ${VALOR_PUNTO:,.0f} COP", bold=True)
+            self.lbl_ibc_info = fila_card(card_info, "IBC Seguridad Social:", f"$ {bruto:,.0f} COP", bold=True)
+        elif profesor.tipo_vinculacion == "Ocasional":
+            fila_card(card_info, "Categoría Docente:", (profesor.categoria_escalafon or "—").upper(), bold=True)
+            fila_card(card_info, "Dedicación:", profesor.dedicacion, bold=True)
+            fact = factor_ocasional(profesor) or 0.0
+            fila_card(card_info, "Factor Acuerdo UPC 027:", f"{fact:.3f} SMMLV", bold=True)
+            fila_card(card_info, "SMMLV 2026 Vigente:", f"$ {SMMLV:,.0f} COP", bold=True)
+            self.lbl_ibc_info = fila_card(card_info, "IBC Seguridad Social:", f"$ {bruto:,.0f} COP", bold=True)
+        else:
+            fila_card(card_info, "Horas Cátedra Semanales:", str(profesor.horas_catedra_semanales), bold=True)
+            self.lbl_ibc_info = fila_card(card_info, "IBC Seguridad Social:", f"$ {bruto:,.0f} COP", bold=True)
+        tk.Frame(card_info, bg="white", height=6).pack()
+
+        # 5. PROVISIONES PRESTACIONALES CONTABLES (ACUMULADO AUDITABLE)
+        card_ps, self.lbl_sub_ps = crear_tarjeta("PROVISIÓN PRESTACIONES SOCIALES (LEY 52 / DTO 1279)", f"$ {calcular_total_prestaciones(bruto):,.0f} COP", color_titulo="#059669")
+        prima_s  = calcular_prima_servicios(bruto)
+        ces      = calcular_cesantias(bruto)
+        int_ces  = calcular_intereses_cesantias(bruto)
+        p_nav    = calcular_prima_navidad(bruto)
+        vac      = calcular_vacaciones(bruto)
+        p_vac    = calcular_prima_vacaciones(bruto)
+        bonif    = calcular_bonificacion_servicios(bruto)
+        self.lbl_ps_prima_s = fila_card(card_ps, "Prima de Servicios (Art. 44 Dto. 1279)", f"$ {prima_s:,.0f} COP")
+        self.lbl_ps_ces     = fila_card(card_ps, "Cesantías (Art. 45 Dto. 1279)", f"$ {ces:,.0f} COP")
+        self.lbl_ps_int_ces = fila_card(card_ps, "Intereses a Cesantías (Ley 52/1975 1%/mes)", f"$ {int_ces:,.0f} COP")
+        self.lbl_ps_p_nav   = fila_card(card_ps, "Prima de Navidad (Dto. 1042/1978 Art. 33)", f"$ {p_nav:,.0f} COP")
+        self.lbl_ps_vac     = fila_card(card_ps, "Vacaciones (15 días hábiles/año)", f"$ {vac:,.0f} COP")
+        self.lbl_ps_p_vac   = fila_card(card_ps, "Prima de Vacaciones (Dto. 1279 Art. 33)", f"$ {p_vac:,.0f} COP")
+        self.lbl_ps_bonif   = fila_card(card_ps, "Bonificación por Servicios (Dto. 1279 Art. 39)", f"$ {bonif:,.0f} COP")
+        tk.Frame(card_ps, bg="white", height=6).pack()
+
+        # 6. BANNER NETO A PAGAR (VERDE)
+        neto_box = tk.Frame(inner, bg="white", highlightbackground="#10b981", highlightthickness=2)
+        neto_box.pack(fill="x", padx=20, pady=(4, 16))
+
+        neto_top = tk.Frame(neto_box, bg="white")
+        neto_top.pack(fill="x", padx=16, pady=(12, 4))
+        tk.Label(neto_top, text="NETO A PAGAR:", font=("Segoe UI", 12, "bold"),
+                 bg="white", fg="#111827").pack(side="left")
+        self.lbl_neto_val = tk.Label(neto_top, text=f"$ {neto:,.0f} COP",
+                                     font=("Segoe UI", 14, "bold"), bg="white", fg="#059669")
+        self.lbl_neto_val.pack(side="right")
+
+        self.lbl_neto_resumen = tk.Label(
+            neto_box,
+            text=f"Total Devengado: $ {bruto:,.0f} COP  ·  Total Deducciones: -$ {total_ded:,.0f} COP",
+            font=("Segoe UI", 9), bg="white", fg="#6b7280"
+        )
+        self.lbl_neto_resumen.pack(anchor="w", padx=16, pady=(0, 12))
+
+        # Guardar valores para switch Anual / Mensual
+        self._val = {
+            "bruto": bruto, "total_ded": total_ded, "salud_e": salud_e, "pension_e": pension_e, "fsp_e": fsp_e,
+            "costo_upc": costo_upc, "ap_salud": ap["salud"], "ap_pension": ap["pension"],
+            "ap_arl": ap["arl"], "ap_caja": ap["caja"], "neto": neto,
+            "total_ps": calcular_total_prestaciones(bruto),
+            "prima_s": prima_s, "ces": ces, "int_ces": int_ces, "p_nav": p_nav,
+            "vac": vac, "p_vac": p_vac, "bonif": bonif,
+        }
+
+        # Botón cerrar
+        ttk.Button(inner, text="Cerrar", command=self.destroy).pack(pady=(0, 20))
         self.transient(parent)
         self.grab_set()
+
+    def _alternar_periodo(self):
+        """Alterna entre vista mensual y anual."""
+        if not hasattr(self, "_val"):
+            return
+        v = self._val
+        if self.periodo == "mensual":
+            self.periodo = "anual"
+            f = 12
+            self.btn_periodo.configure(text="Ver mensual")
+            self.lbl_periodo_fechas.configure(text="🗓 Período Liquidado: Año Vigente 2026 (Consolidado 12 Meses)")
+        else:
+            self.periodo = "mensual"
+            f = 1
+            self.btn_periodo.configure(text="Ver anual")
+            self.lbl_periodo_fechas.configure(text="🗓 Período Liquidado: Marzo 2026  ·  01/03/2026 - 31/03/2026")
+
+        # Devengados
+        self.lbl_sub_dev.configure(text=f"$ {v['bruto']*f:,.0f} COP")
+        self.lbl_asig_val.configure(text=f"+ $ {v['bruto']*f:,.0f} COP")
+
+        # Deducciones
+        self.lbl_sub_ded.configure(text=f"$ {v['total_ded']*f:,.0f} COP")
+        self.lbl_ibc_ded.configure(text=f"$ {v['bruto']*f:,.0f} COP")
+        self.lbl_salud_val.configure(text=f"- $ {v['salud_e']*f:,} COP")
+        self.lbl_pension_val.configure(text=f"- $ {v['pension_e']*f:,} COP")
+        self.lbl_fsp_val.configure(text=f"- $ {v['fsp_e']*f:,} COP" if v['fsp_e'] > 0 else "$ 0 COP")
+
+        # Costo Empleador
+        self.lbl_sub_costo.configure(text=f"$ {v['costo_upc']*f:,.0f} COP")
+        self.lbl_costo_asig.configure(text=f"$ {v['bruto']*f:,.0f} COP")
+        self.lbl_ap_salud.configure(text=f"$ {v['ap_salud']*f:,} COP")
+        self.lbl_ap_pension.configure(text=f"$ {v['ap_pension']*f:,} COP")
+        self.lbl_ap_arl.configure(text=f"$ {v['ap_arl']*f:,} COP")
+        self.lbl_ap_caja.configure(text=f"$ {v['ap_caja']*f:,} COP")
+        self.lbl_costo_total_upc.configure(text=f"$ {v['costo_upc']*f:,.0f} COP")
+
+        # Info Salarial
+        if hasattr(self, "lbl_ibc_info"):
+            self.lbl_ibc_info.configure(text=f"$ {v['bruto']*f:,.0f} COP")
+
+        # Prestaciones
+        self.lbl_sub_ps.configure(text=f"$ {v['total_ps']*f:,.0f} COP")
+        self.lbl_ps_prima_s.configure(text=f"$ {v['prima_s']*f:,.0f} COP")
+        self.lbl_ps_ces.configure(text=f"$ {v['ces']*f:,.0f} COP")
+        self.lbl_ps_int_ces.configure(text=f"$ {v['int_ces']*f:,.0f} COP")
+        self.lbl_ps_p_nav.configure(text=f"$ {v['p_nav']*f:,.0f} COP")
+        self.lbl_ps_vac.configure(text=f"$ {v['vac']*f:,.0f} COP")
+        self.lbl_ps_p_vac.configure(text=f"$ {v['p_vac']*f:,.0f} COP")
+        self.lbl_ps_bonif.configure(text=f"$ {v['bonif']*f:,.0f} COP")
+
+        # Neto
+        self.lbl_neto_val.configure(text=f"$ {v['neto']*f:,.0f} COP")
+        self.lbl_neto_resumen.configure(text=f"Total Devengado: $ {v['bruto']*f:,.0f} COP  ·  Total Deducciones: -$ {v['total_ded']*f:,.0f} COP")
+
+
+class VentanaSalarioAdmin(tk.Toplevel):
+    """Desprendible Oficial de Pago de Nómina Administrativa (UPC)."""
+    def __init__(self, parent, admin):
+        super().__init__(parent)
+        self.title(f"Desprendible Administrativo - {admin.nombre_completo}")
+        self.configure(bg="#eef2f6")
+        self.resizable(True, True)
+        self.geometry("640x780")
+        self.minsize(580, 640)
+        self.periodo = "mensual"
+
+        # ── Scrollable content ─────────────────────────────────────────────
+        canvas = tk.Canvas(self, bg="#eef2f6", highlightthickness=0)
+        vsb = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        inner = tk.Frame(canvas, bg="#eef2f6")
+        canvas_window = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        def _on_inner_configure(e):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        def _on_canvas_configure(e):
+            canvas.itemconfig(canvas_window, width=e.width)
+
+        inner.bind("<Configure>", _on_inner_configure)
+        canvas.bind("<Configure>", _on_canvas_configure)
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(
+            int(-1 * (e.delta / 120)), "units"))
+
+        # ── Encabezado Oficial ─────────────────────────────────────────────
+        card_header = tk.Frame(inner, bg="white", highlightbackground="#dce2ea", highlightthickness=1)
+        card_header.pack(fill="x", padx=20, pady=(16, 12))
+
+        top_h = tk.Frame(card_header, bg="white")
+        top_h.pack(fill="x", padx=16, pady=(14, 4))
+        tk.Label(top_h, text="🗎  Desprendible Oficial de Pago - Personal Administrativo",
+                 font=("Segoe UI", 12, "bold"), bg="white", fg="#111827").pack(side="left")
+        self.btn_periodo = ttk.Button(top_h, text="Ver anual", command=self._alternar_periodo)
+        self.btn_periodo.pack(side="right")
+
+        facultad = admin.codigo_facultad if admin.codigo_facultad else "Nivel Central"
+        liq_num = abs(hash(admin.identificacion)) % 900 + 100
+        sub_info = f"Funcionario: {admin.nombre_completo}  |  Cargo: {admin.cargo} ({admin.categoria})  |  Liquidación N° {liq_num}"
+        tk.Label(card_header, text=sub_info, font=("Segoe UI", 9), bg="white", fg="#6b7280").pack(anchor="w", padx=16, pady=(0, 4))
+        tk.Label(card_header, text=f"Contratación: {admin.tipo_contratacion}  |  Adscrito a: {facultad}",
+                 font=("Segoe UI", 9, "italic"), bg="white", fg="#4b5563").pack(anchor="w", padx=16, pady=(0, 4))
+
+        self.lbl_periodo_fechas = tk.Label(card_header, text="🗓 Período Liquidado: Marzo 2026  ·  01/03/2026 - 31/03/2026",
+                                           font=("Segoe UI", 9, "bold"), bg="white", fg="#1d4ed8")
+        self.lbl_periodo_fechas.pack(anchor="w", padx=16, pady=(0, 14))
+
+        # ── Cálculos ───────────────────────────────────────────────────────
+        bruto     = calcular_salario_bruto_admin(admin)
+        salud_e   = calcular_descuento_salud_admin(bruto)
+        pension_e = calcular_descuento_pension_admin(bruto)
+        fsp_e     = calcular_descuento_fsp_admin(bruto)
+        total_ded = salud_e + pension_e + fsp_e
+        neto      = bruto - total_ded
+
+        ap = calcular_aportes_patronales_admin(bruto)
+        costo_upc = bruto + ap["total"]
+
+        def crear_tarjeta(titulo, subtotal_txt="", color_titulo="#1f4e79"):
+            card = tk.Frame(inner, bg="white", highlightbackground="#dce2ea", highlightthickness=1)
+            card.pack(fill="x", padx=20, pady=(0, 12))
+
+            header_t = tk.Frame(card, bg="white")
+            header_t.pack(fill="x", padx=16, pady=(12, 8))
+            tk.Label(header_t, text=titulo, font=("Segoe UI", 10, "bold"),
+                     bg="white", fg=color_titulo).pack(side="left")
+            lbl_sub = None
+            if subtotal_txt:
+                lbl_sub = tk.Label(header_t, text=subtotal_txt, font=("Segoe UI", 10, "bold"),
+                                   bg="white", fg=color_titulo)
+                lbl_sub.pack(side="right")
+            return card, lbl_sub
+
+        def fila_card(parent, label, valor, bold=False, color="#111827"):
+            f = tk.Frame(parent, bg="white")
+            f.pack(fill="x", padx=16, pady=3)
+            tk.Label(f, text=label, font=FONT_BOLD if bold else FONT,
+                     bg="white", fg="#374151" if not bold else "#111827").pack(side="left")
+            lbl = tk.Label(f, text=valor, font=FONT_BOLD if bold else FONT,
+                           bg="white", fg=color)
+            lbl.pack(side="right")
+            return lbl
+
+        # 1. DEVENGADOS Y ASIGNACIONES (+)
+        card_dev, self.lbl_sub_dev = crear_tarjeta(
+            "DEVENGADOS Y ASIGNACIONES (+)", f"$ {bruto:,.0f} COP", color_titulo="#1d4ed8")
+        desc_asig = f"Asignación Salarial Base ({admin.categoria} - Decretos Salariales 2026)"
+        self.lbl_asig_val = fila_card(card_dev, desc_asig, f"+ $ {bruto:,.0f} COP", bold=True, color="#1d4ed8")
+        tk.Frame(card_dev, bg="white", height=6).pack()
+
+        # 2. DEDUCCIONES OBLIGATORIAS DE LEY (-)
+        card_ded, self.lbl_sub_ded = crear_tarjeta(
+            "DEDUCCIONES OBLIGATORIAS DE LEY (-)", f"$ {total_ded:,.0f} COP", color_titulo="#dc2626")
+        self.lbl_ibc_ded = fila_card(card_ded, "IBC Seguridad Social (Base Cotización):", f"$ {bruto:,.0f} COP", bold=True)
+        tk.Frame(card_ded, bg="white", height=4).pack()
+        self.lbl_salud_val = fila_card(card_ded, "Aporte Salud Trabajador (4%)", f"- $ {salud_e:,} COP", color="#dc2626")
+        self.lbl_pension_val = fila_card(card_ded, "Aporte Pensión Trabajador (4%)", f"- $ {pension_e:,} COP", color="#dc2626")
+        self.lbl_fsp_val = fila_card(card_ded, "Fondo de Solidaridad Pensional (1%)", f"- $ {fsp_e:,} COP" if fsp_e > 0 else "$ 0 COP", color="#dc2626" if fsp_e > 0 else "#6b7280")
+        tk.Frame(card_ded, bg="white", height=6).pack()
+
+        # 3. COSTO TOTAL EMPLEADOR (UPC)
+        card_costo, self.lbl_sub_costo = crear_tarjeta(
+            "COSTO TOTAL EMPLEADOR (UPC)", f"$ {costo_upc:,.0f} COP", color_titulo="#d97706")
+        self.lbl_costo_asig = fila_card(card_costo, "Asignación Básica", f"$ {bruto:,.0f} COP", bold=True, color="#1d4ed8")
+        self.lbl_ap_salud = fila_card(card_costo, "Salud Patronal (8.5%)", f"$ {ap['salud']:,} COP", color="#4b5563")
+        self.lbl_ap_pension = fila_card(card_costo, "Pensión Patronal (12%)", f"$ {ap['pension']:,} COP", color="#4b5563")
+        self.lbl_ap_arl = fila_card(card_costo, "Aporte Riesgos Laborales (ARL)", f"$ {ap['arl']:,} COP", color="#4b5563")
+        self.lbl_ap_caja = fila_card(card_costo, "Caja de Compensación Familiar (4%)", f"$ {ap['caja']:,} COP", color="#4b5563")
+        tk.Frame(card_costo, bg="#f3f4f6", height=1).pack(fill="x", padx=16, pady=6)
+        self.lbl_costo_total_upc = fila_card(card_costo, "TOTAL COSTO UPC", f"$ {costo_upc:,.0f} COP", bold=True, color="#1d4ed8")
+        tk.Frame(card_costo, bg="white", height=6).pack()
+
+        # 4. BANNER NETO A PAGAR (VERDE)
+        neto_box = tk.Frame(inner, bg="white", highlightbackground="#10b981", highlightthickness=2)
+        neto_box.pack(fill="x", padx=20, pady=(4, 16))
+
+        neto_top = tk.Frame(neto_box, bg="white")
+        neto_top.pack(fill="x", padx=16, pady=(12, 4))
+        tk.Label(neto_top, text="NETO A PAGAR:", font=("Segoe UI", 12, "bold"),
+                 bg="white", fg="#111827").pack(side="left")
+        self.lbl_neto_val = tk.Label(neto_top, text=f"$ {neto:,.0f} COP",
+                                     font=("Segoe UI", 14, "bold"), bg="white", fg="#059669")
+        self.lbl_neto_val.pack(side="right")
+
+        self.lbl_neto_resumen = tk.Label(
+            neto_box,
+            text=f"Total Devengado: $ {bruto:,.0f} COP  ·  Total Deducciones: -$ {total_ded:,.0f} COP",
+            font=("Segoe UI", 9), bg="white", fg="#6b7280"
+        )
+        self.lbl_neto_resumen.pack(anchor="w", padx=16, pady=(0, 12))
+
+        # Guardar valores para switch Anual / Mensual
+        self._val = {
+            "bruto": bruto, "total_ded": total_ded, "salud_e": salud_e, "pension_e": pension_e, "fsp_e": fsp_e,
+            "costo_upc": costo_upc, "ap_salud": ap["salud"], "ap_pension": ap["pension"],
+            "ap_arl": ap["arl"], "ap_caja": ap["caja"], "neto": neto,
+        }
+
+        ttk.Button(inner, text="Cerrar", command=self.destroy).pack(pady=(0, 20))
+        self.transient(parent)
+        self.grab_set()
+
+    def _alternar_periodo(self):
+        """Alterna entre vista mensual y anual."""
+        if not hasattr(self, "_val"):
+            return
+        v = self._val
+        if self.periodo == "mensual":
+            self.periodo = "anual"
+            f = 12
+            self.btn_periodo.configure(text="Ver mensual")
+            self.lbl_periodo_fechas.configure(text="🗓 Período Liquidado: Año Vigente 2026 (Consolidado 12 Meses)")
+        else:
+            self.periodo = "mensual"
+            f = 1
+            self.btn_periodo.configure(text="Ver anual")
+            self.lbl_periodo_fechas.configure(text="🗓 Período Liquidado: Marzo 2026  ·  01/03/2026 - 31/03/2026")
+
+        self.lbl_sub_dev.configure(text=f"$ {v['bruto']*f:,.0f} COP")
+        self.lbl_asig_val.configure(text=f"+ $ {v['bruto']*f:,.0f} COP")
+        self.lbl_sub_ded.configure(text=f"$ {v['total_ded']*f:,.0f} COP")
+        self.lbl_ibc_ded.configure(text=f"$ {v['bruto']*f:,.0f} COP")
+        self.lbl_salud_val.configure(text=f"- $ {v['salud_e']*f:,} COP")
+        self.lbl_pension_val.configure(text=f"- $ {v['pension_e']*f:,} COP")
+        self.lbl_fsp_val.configure(text=f"- $ {v['fsp_e']*f:,} COP" if v['fsp_e'] > 0 else "$ 0 COP")
+        self.lbl_sub_costo.configure(text=f"$ {v['costo_upc']*f:,.0f} COP")
+        self.lbl_costo_asig.configure(text=f"$ {v['bruto']*f:,.0f} COP")
+        self.lbl_ap_salud.configure(text=f"$ {v['ap_salud']*f:,} COP")
+        self.lbl_ap_pension.configure(text=f"$ {v['ap_pension']*f:,} COP")
+        self.lbl_ap_arl.configure(text=f"$ {v['ap_arl']*f:,} COP")
+        self.lbl_ap_caja.configure(text=f"$ {v['ap_caja']*f:,} COP")
+        self.lbl_costo_total_upc.configure(text=f"$ {v['costo_upc']*f:,.0f} COP")
+        self.lbl_neto_val.configure(text=f"$ {v['neto']*f:,.0f} COP")
+        self.lbl_neto_resumen.configure(text=f"Total Devengado: $ {v['bruto']*f:,.0f} COP  ·  Total Deducciones: -$ {v['total_ded']*f:,.0f} COP")
+
 
 
 if __name__ == "__main__":

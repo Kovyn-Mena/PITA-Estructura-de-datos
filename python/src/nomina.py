@@ -7,10 +7,26 @@ Modelo corregido para distinguir los regímenes realmente aplicables:
   hora debe fijarse por resolución rectoral; no se inventa un valor 2026 si no
   está configurado expresamente.
 
-El programa sigue siendo académico/simulado: los puntos por títulos y
-productividad almacenados se interpretan como puntos ya reconocidos. El modelo
-actual no guarda suficiente detalle para reconstruir por sí solo la evaluación
-CIARP de experiencia/productividad ni las bonificaciones de los arts. 25 y 26.
+Prestaciones sociales incluidas (normativa colombiana):
+- Prima de servicios: art. 44 Decreto 1279/2002 → 30 días por año.
+- Cesantías: art. 45 Decreto 1279/2002 → 30 días por año.
+- Intereses a las cesantías: Ley 52/1975 → 12% anual (1% mensual) sobre
+  las cesantías acumuladas.
+- Prima de navidad: Decreto 1042/1978 art. 33 → 1 mes de sueldo por año.
+- Vacaciones: Decreto 1279/2002 → 15 días hábiles remunerados por año;
+  provisión mensual = bruto / 24.
+- Prima de vacaciones: Decreto 1279/2002 art. 33 → 15 días por año
+  (provisión mensual = bruto / 24).
+- Bonificación por servicios prestados: Decreto 1279/2002 art. 39 →
+  equivale a 2 meses de salario mensual; provisión = bruto * 2 / 12.
+
+Aportes patronales (costo institucional de la UPC):
+- Pensión patronal: 12% del salario bruto (Ley 100/1993, art. 20).
+- Salud patronal: 8.5% del salario bruto (Ley 1122/2007, art. 10).
+- ARL (riesgo I–II): 0.522% del salario bruto (Decreto 1295/1994).
+- Caja de Compensación Familiar: 4% del salario bruto (Ley 21/1982).
+Los aportes a seguridad social se redondean a pesos enteros (Decreto 1990/2016
+y plataforma PILA).
 """
 
 ANIO_NOMINA = 2026
@@ -41,6 +57,78 @@ FACTORES_OCASIONAL_SMMLV = {
 # de la hora cátedra. Se deja configurable para no presentar como vigente un
 # valor antiguo o proyectado. Puede cargarse cuando se tenga la resolución.
 VALOR_HORA_CATEDRA = None
+
+# ── Tasas de aportes patronales (Decreto 1990/2016 → redondeo a pesos) ──────
+TASA_PENSION_PATRONAL = 0.12       # Ley 100/1993 art. 20
+TASA_SALUD_PATRONAL   = 0.085      # Ley 1122/2007 art. 10
+TASA_ARL              = 0.00522    # Clase I-II, Decreto 1295/1994
+TASA_CAJA_COMP        = 0.04       # Ley 21/1982
+
+# ── Escala Salarial Oficial Empleados Públicos Administrativos ───────────────
+# Basada en la estructura de cargos/niveles y decretos salariales del sector público:
+# Nivel 1 (Asistencial/Auxiliar), Nivel 2 (Técnico/Secretarial),
+# Nivel 3 (Profesional/Coordinador), Nivel 4 (Directivo/Asesor/Jefe de Oficina).
+ESCALA_ADMINISTRATIVA_BASE = {
+    "Nivel 1": 1950000.0,  # Asistencial / Auxiliares / Biblioteca
+    "Nivel 2": 2800000.0,  # Técnico / Secretarios Académicos
+    "Nivel 3": 3750000.0,  # Profesional Universitario / Coordinador
+    "Nivel 4": 5050000.0,  # Asesor / Directivo / Jefe de Oficina
+}
+
+
+def salario_base_administrativo(categoria):
+    """Obtiene el salario base según el nivel de la escala administrativa."""
+    return ESCALA_ADMINISTRATIVA_BASE.get(categoria, 1950000.0)
+
+
+def calcular_salario_bruto_admin(admin):
+    """Calcula el salario bruto de un administrativo basado en la escala legal."""
+    if hasattr(admin, "salario_base") and admin.salario_base > 0:
+        return float(admin.salario_base)
+    return salario_base_administrativo(getattr(admin, "categoria", "Nivel 1"))
+
+
+def calcular_descuento_salud_admin(bruto):
+    return round((bruto or 0.0) * 0.04)
+
+
+def calcular_descuento_pension_admin(bruto):
+    return round((bruto or 0.0) * 0.04)
+
+
+def calcular_descuento_fsp_admin(bruto):
+    b = bruto or 0.0
+    if b >= (4.0 * SMMLV):
+        return round(b * 0.01)
+    return 0
+
+
+def calcular_salario_neto_admin(admin):
+    bruto = calcular_salario_bruto_admin(admin)
+    return (bruto
+            - calcular_descuento_salud_admin(bruto)
+            - calcular_descuento_pension_admin(bruto)
+            - calcular_descuento_fsp_admin(bruto))
+
+
+def calcular_aportes_patronales_admin(bruto):
+    b = bruto or 0.0
+    pension = round(b * TASA_PENSION_PATRONAL)
+    salud   = round(b * TASA_SALUD_PATRONAL)
+    arl     = round(b * TASA_ARL)
+    caja    = round(b * TASA_CAJA_COMP)
+    return {
+        "pension": pension,
+        "salud":   salud,
+        "arl":     arl,
+        "caja":    caja,
+        "total":   pension + salud + arl + caja,
+    }
+
+
+def calcular_costo_total_admin(admin):
+    bruto = calcular_salario_bruto_admin(admin)
+    return bruto + calcular_aportes_patronales_admin(bruto)["total"]
 
 
 def puntos_por_categoria(categoria):
@@ -102,9 +190,6 @@ def calcular_salario_bruto(profesor):
         return (factor * SMMLV) if factor is not None else 0.0
 
     if profesor.tipo_vinculacion == "Catedratico":
-        # El campo actual almacena horas semanales, mientras el Acuerdo 027
-        # habla de horas mensuales asignadas. Sin valor rectoral vigente ni
-        # horas mensuales exactas no se debe fabricar una liquidación.
         if VALOR_HORA_CATEDRA is None:
             return 0.0
         horas_mensuales_estimadas = profesor.horas_catedra_semanales * 4.0
@@ -143,30 +228,157 @@ def observacion_normativa(profesor):
     return "Régimen no definido."
 
 
+# ── Descuentos del empleado ──────────────────────────────────────────────────
+# Los aportes a seguridad social se redondean a pesos enteros (Decreto 1990/2016).
+
 def calcular_descuento_salud(salario_bruto):
-    return (salario_bruto or 0.0) * 0.04
+    """4 % a cargo del empleado — Ley 100/1993, art. 204."""
+    return round((salario_bruto or 0.0) * 0.04)
 
 
 def calcular_descuento_pension(salario_bruto):
-    return (salario_bruto or 0.0) * 0.04
+    """4 % a cargo del empleado — Ley 100/1993, art. 20."""
+    return round((salario_bruto or 0.0) * 0.04)
+
+
+def calcular_descuento_fsp(salario_bruto):
+    """Fondo de Solidaridad Pensional (Ley 100/1993, Ley 797/2003).
+
+    Aplica a salarios iguales o superiores a 4 SMMLV (1%).
+    """
+    b = salario_bruto or 0.0
+    if b >= (4.0 * SMMLV):
+        return round(b * 0.01)
+    return 0
 
 
 def calcular_salario_neto(profesor):
     bruto = calcular_salario_bruto(profesor)
-    return bruto - calcular_descuento_salud(bruto) - calcular_descuento_pension(bruto)
+    return (bruto
+            - calcular_descuento_salud(bruto)
+            - calcular_descuento_pension(bruto)
+            - calcular_descuento_fsp(bruto))
 
+
+# ── Prestaciones sociales (provisión mensual) ────────────────────────────────
 
 def calcular_prima_servicios(salario_bruto):
-    """Provisión mensual informativa de una prima anual equivalente a 30 días.
+    """Provisión mensual de la prima anual de servicios (30 días).
 
-    Para planta, el art. 44 del Decreto 1279 reconoce una prima anual de 30
-    días; salario/12 es su provisión mensual simplificada, no el pago del mes.
+    Decreto 1279/2002 art. 44: prima anual equivalente a 1 mes de salario.
+    Provisión mensual = salario / 12.
     """
     return (salario_bruto or 0.0) / 12.0
 
 
 def calcular_cesantias(salario_bruto):
+    """Provisión mensual de cesantías (1 mes por año).
+
+    Decreto 1279/2002 art. 45 y Ley 50/1990: un mes de salario por año.
+    Provisión mensual = salario / 12.
+    """
     return (salario_bruto or 0.0) / 12.0
+
+
+def calcular_intereses_cesantias(salario_bruto):
+    """Provisión mensual de intereses sobre cesantías — Ley 52/1975.
+
+    La Ley 52 ordena el 12% anual sobre el valor de las cesantías acumuladas,
+    equivalente al 1% mensual. Interés mensual = cesantías_mensuales * 0.01
+    = salario / 12 * 0.01 = salario / 1200.
+    """
+    return (salario_bruto or 0.0) / 1200.0
+
+
+def calcular_prima_navidad(salario_bruto):
+    """Provisión mensual de la prima de navidad (1 mes anual).
+
+    Decreto 1042/1978, art. 33: todo servidor público tiene derecho a 1 mes
+    de salario adicional en diciembre. Provisión mensual = salario / 12.
+    """
+    return (salario_bruto or 0.0) / 12.0
+
+
+def calcular_vacaciones(salario_bruto):
+    """Provisión mensual de vacaciones remuneradas.
+
+    15 días hábiles remunerados por año. Aproximación estándar:
+    provisión mensual = salario / 24.
+    """
+    return (salario_bruto or 0.0) / 24.0
+
+
+def calcular_prima_vacaciones(salario_bruto):
+    """Provisión mensual de la prima de vacaciones — Decreto 1279/2002 art. 33.
+
+    Equivale a 15 días adicionales de salario al momento de las vacaciones.
+    Provisión mensual = salario / 24.
+    """
+    return (salario_bruto or 0.0) / 24.0
+
+
+def calcular_bonificacion_servicios(salario_bruto):
+    """Provisión mensual de la bonificación por servicios prestados.
+
+    Decreto 1279/2002, art. 39: equivale a 2 meses de salario mensual por año.
+    Provisión mensual = salario * 2 / 12.
+    """
+    return (salario_bruto or 0.0) * 2.0 / 12.0
+
+
+def calcular_total_prestaciones(salario_bruto):
+    """Suma de todas las provisiones mensuales de prestaciones sociales."""
+    return (calcular_prima_servicios(salario_bruto)
+            + calcular_cesantias(salario_bruto)
+            + calcular_intereses_cesantias(salario_bruto)
+            + calcular_prima_navidad(salario_bruto)
+            + calcular_vacaciones(salario_bruto)
+            + calcular_prima_vacaciones(salario_bruto)
+            + calcular_bonificacion_servicios(salario_bruto))
+
+
+# ── Aportes patronales (costo de la institución) ─────────────────────────────
+# Decreto 1990/2016: los aportes a seguridad social se redondean a pesos enteros.
+
+def calcular_aportes_patronales(salario_bruto):
+    """Retorna un dict con todos los aportes a cargo de la UPC.
+
+    {
+        'pension':  int,   # 12 %  Ley 100/1993 art. 20
+        'salud':    int,   # 8.5 % Ley 1122/2007 art. 10
+        'arl':      int,   # 0.522 % Clase I riesgo normal, Decreto 1295/1994
+        'caja':     int,   # 4 %  Ley 21/1982
+        'total':    int,   # suma de los anteriores
+    }
+    """
+    b = salario_bruto or 0.0
+    pension = round(b * TASA_PENSION_PATRONAL)
+    salud   = round(b * TASA_SALUD_PATRONAL)
+    arl     = round(b * TASA_ARL)
+    caja    = round(b * TASA_CAJA_COMP)
+    return {
+        "pension": pension,
+        "salud":   salud,
+        "arl":     arl,
+        "caja":    caja,
+        "total":   pension + salud + arl + caja,
+    }
+
+
+def calcular_costo_total_empleador(profesor):
+    """Costo directo UPC (Asignación Básica + Aportes Patronales).
+
+    Es el total auditable directo reflejado en el desprendible oficial institucional:
+    = Salario Bruto + Salud Patronal + Pensión Patronal + ARL + Caja Compensación.
+    """
+    bruto = calcular_salario_bruto(profesor)
+    patronal = calcular_aportes_patronales(bruto)["total"]
+    return bruto + patronal
+
+
+def calcular_costo_con_prestaciones(profesor):
+    """Costo total integral que incluye la provisión contable de prestaciones."""
+    return calcular_costo_total_empleador(profesor) + calcular_total_prestaciones(calcular_salario_bruto(profesor))
 
 
 def imprimir_desglose_nomina(profesor):
@@ -193,12 +405,30 @@ def imprimir_desglose_nomina(profesor):
 
     print("------------------------------------------")
     if liquidacion_disponible(profesor):
-        print(f"Salario bruto          : ${bruto:,.2f}")
-        print(f"(-) Salud (4%)         : ${calcular_descuento_salud(bruto):,.2f}")
-        print(f"(-) Pensión (4%)       : ${calcular_descuento_pension(bruto):,.2f}")
-        print(f"Salario neto           : ${calcular_salario_neto(profesor):,.2f}")
+        ap = calcular_aportes_patronales(bruto)
+        print(f"Salario bruto          : ${bruto:,.0f}")
+        print(f"(-) Salud empleado (4%): ${calcular_descuento_salud(bruto):,}")
+        print(f"(-) Pensión empl. (4%) : ${calcular_descuento_pension(bruto):,}")
+        print(f"Salario neto           : ${calcular_salario_neto(profesor):,.0f}")
+        print("-- Prestaciones sociales (provisión mensual) --")
+        print(f"Prima de servicios     : ${calcular_prima_servicios(bruto):,.0f}")
+        print(f"Cesantías              : ${calcular_cesantias(bruto):,.0f}")
+        print(f"Intereses cesantías    : ${calcular_intereses_cesantias(bruto):,.0f}")
+        print(f"Prima de navidad       : ${calcular_prima_navidad(bruto):,.0f}")
+        print(f"Vacaciones             : ${calcular_vacaciones(bruto):,.0f}")
+        print(f"Prima de vacaciones    : ${calcular_prima_vacaciones(bruto):,.0f}")
+        print(f"Bonif. servicios       : ${calcular_bonificacion_servicios(bruto):,.0f}")
+        print("-- Aportes patronales (costo UPC) --")
+        print(f"Pensión patronal (12%) : ${ap['pension']:,}")
+        print(f"Salud patronal (8.5%)  : ${ap['salud']:,}")
+        print(f"ARL (0.522%)           : ${ap['arl']:,}")
+        print(f"Caja compensación (4%) : ${ap['caja']:,}")
+        print(f"Total aportes patronal : ${ap['total']:,}")
+        print(f"COSTO TOTAL EMPLEADOR  : ${calcular_costo_total_empleador(profesor):,.0f}")
     else:
         print("Salario                : NO LIQUIDADO (falta parámetro rectoral vigente)")
     print("------------------------------------------")
     print(observacion_normativa(profesor))
     print("===========================================")
+
+

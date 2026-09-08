@@ -1,87 +1,318 @@
 #include "../include/nomina.h"
 #include <iostream>
 #include <iomanip>
+#include <cmath>
 
 using namespace std;
 
-// Parametro configurable — NO hardcodear en la logica, se declara aqui
-// y se puede cambiar desde main() o cargar de un archivo de configuracion.
-double VALOR_PUNTO = 20895.0; // referencia 2024, Decreto 1279/2002
+// Parámetros vigentes 2026.
+double VALOR_PUNTO = 23924.0;       // Decreto 318 de 2026, art. 2
+double SMMLV = 1750905.0;           // Decreto 159 de 2026
+static const int PUNTOS_PREGRADO = 178; // Decreto 1279/2002, art. 7
+static const double VALOR_HORA_CATEDRA = 0.0; // Pendiente resolución rectoral
+
+// Tasas de aportes patronales (Decreto 1990/2016 → redondeo a pesos enteros)
+static const double TASA_PENSION_PATRONAL = 0.12;    // Ley 100/1993 art. 20
+static const double TASA_SALUD_PATRONAL   = 0.085;   // Ley 1122/2007 art. 10
+static const double TASA_ARL              = 0.00522; // Decreto 1295/1994
+static const double TASA_CAJA_COMP        = 0.04;    // Ley 21/1982
 
 int puntosPorCategoria(const string& categoria) {
     if (categoria == "Auxiliar")  return 37;
     if (categoria == "Asistente") return 58;
     if (categoria == "Asociado")  return 74;
     if (categoria == "Titular")   return 96;
-    return 0; // catedraticos sin escalafon formal
+    return 0;
 }
 
 int totalPuntos(const Profesor& p) {
-    return puntosPorCategoria(p.categoriaEscalafon)
+    if (p.tipoVinculacion != "Planta") return 0;
+    return PUNTOS_PREGRADO
+         + puntosPorCategoria(p.categoriaEscalafon)
          + p.puntosTitulos
          + p.puntosProductividad;
 }
 
 double factorProporcionalidad(const Profesor& p) {
-    // Segun el Decreto 1279 (Art. 6, paragrafo): dedicaciones distintas a
-    // tiempo completo se calculan de forma proporcional.
     if (p.dedicacion == "TiempoCompleto") return 1.0;
     if (p.dedicacion == "MedioTiempo")    return 0.5;
-    if (p.dedicacion == "HorasCatedra") {
-        // proporcional a 18 horas semanales = "tiempo completo" de catedra
-        return static_cast<double>(p.horasCatedraSemanales) / 18.0;
-    }
     return 1.0;
 }
 
+double factorOcasional(const Profesor& p) {
+    if (p.categoriaEscalafon == "Auxiliar" && p.dedicacion == "TiempoCompleto") return 2.645;
+    if (p.categoriaEscalafon == "Auxiliar" && p.dedicacion == "MedioTiempo")    return 1.509;
+    if (p.categoriaEscalafon == "Asistente" && p.dedicacion == "TiempoCompleto") return 3.125;
+    if (p.categoriaEscalafon == "Asistente" && p.dedicacion == "MedioTiempo")    return 1.749;
+    if (p.categoriaEscalafon == "Asociado" && p.dedicacion == "TiempoCompleto") return 3.606;
+    if (p.categoriaEscalafon == "Asociado" && p.dedicacion == "MedioTiempo")    return 1.990;
+    if (p.categoriaEscalafon == "Titular" && p.dedicacion == "TiempoCompleto") return 3.918;
+    if (p.categoriaEscalafon == "Titular" && p.dedicacion == "MedioTiempo")    return 2.146;
+    return 0.0;
+}
+
 double calcularSalarioBruto(const Profesor& p) {
-    if (p.adHonorem) return 0.0; // ad-honorem: sin remuneracion
-    return totalPuntos(p) * VALOR_PUNTO * factorProporcionalidad(p);
+    if (p.adHonorem) return 0.0;
+
+    if (p.tipoVinculacion == "Planta") {
+        return totalPuntos(p) * VALOR_PUNTO * factorProporcionalidad(p);
+    }
+
+    if (p.tipoVinculacion == "Ocasional") {
+        return factorOcasional(p) * SMMLV;
+    }
+
+    if (p.tipoVinculacion == "Catedratico") {
+        if (VALOR_HORA_CATEDRA <= 0.0) return 0.0;
+        double horasMensualesEstimadas = p.horasCatedraSemanales * 4.0;
+        return horasMensualesEstimadas * VALOR_HORA_CATEDRA;
+    }
+
+    return 0.0;
 }
 
-double calcularDescuentoSalud(double salarioBruto) {
-    return salarioBruto * 0.04;
+bool liquidacionDisponible(const Profesor& p) {
+    if (p.adHonorem) return true;
+    if (p.tipoVinculacion == "Catedratico" && VALOR_HORA_CATEDRA <= 0.0) return false;
+    if (p.tipoVinculacion == "Ocasional" && factorOcasional(p) <= 0.0) return false;
+    return true;
 }
 
-double calcularDescuentoPension(double salarioBruto) {
-    return salarioBruto * 0.04;
+string observacionNormativa(const Profesor& p) {
+    if (p.adHonorem) return "Ad-honorem: sin remuneracion (Acuerdo 027/2024).";
+    if (p.tipoVinculacion == "Planta") return "Planta: Decreto 1279/2002.";
+    if (p.tipoVinculacion == "Ocasional") return "Ocasional: Acuerdo UPC 027/2024, art. 24.";
+    if (p.tipoVinculacion == "Catedratico") {
+        if (VALOR_HORA_CATEDRA <= 0.0)
+            return "Catedratico: pendiente resolucion rectoral vigente de valor hora (Acuerdo 027/2024).";
+        return "Catedratico: liquidacion por horas Acuerdo 027/2024.";
+    }
+    return "Regimen no definido.";
+}
+
+long long calcularDescuentoSalud(double salarioBruto) {
+    return llround(salarioBruto * 0.04);
+}
+
+long long calcularDescuentoPension(double salarioBruto) {
+    return llround(salarioBruto * 0.04);
+}
+
+long long calcularDescuentoFSP(double salarioBruto) {
+    if (salarioBruto >= (4.0 * SMMLV)) {
+        return llround(salarioBruto * 0.01);
+    }
+    return 0;
 }
 
 double calcularSalarioNeto(const Profesor& p) {
     double bruto = calcularSalarioBruto(p);
-    return bruto - calcularDescuentoSalud(bruto) - calcularDescuentoPension(bruto);
+    return bruto - calcularDescuentoSalud(bruto)
+                 - calcularDescuentoPension(bruto)
+                 - calcularDescuentoFSP(bruto);
 }
 
 double calcularPrimaServicios(double salarioBruto) {
-    // Prima de servicios: 1 salario mensual por semestre trabajado (aprox. mensualizado)
-    return salarioBruto / 12.0;
+    return salarioBruto / 12.0; // Decreto 1279/2002 art. 44 (1 mes / año)
 }
 
 double calcularCesantias(double salarioBruto) {
-    // Cesantias: 1 salario mensual por ano trabajado (aprox. mensualizado)
-    return salarioBruto / 12.0;
+    return salarioBruto / 12.0; // Decreto 1279/2002 art. 45 y Ley 50/1990
+}
+
+double calcularInteresesCesantias(double salarioBruto) {
+    return salarioBruto / 1200.0; // Ley 52/1975 (1% mensual)
+}
+
+double calcularPrimaNavidad(double salarioBruto) {
+    return salarioBruto / 12.0; // Decreto 1042/1978 art. 33
+}
+
+double calcularVacaciones(double salarioBruto) {
+    return salarioBruto / 24.0; // 15 días hábiles al año
+}
+
+double calcularPrimaVacaciones(double salarioBruto) {
+    return salarioBruto / 24.0; // Decreto 1279/2002 art. 33
+}
+
+double calcularBonificacionServicios(double salarioBruto) {
+    return salarioBruto * 2.0 / 12.0; // Decreto 1279/2002 art. 39
+}
+
+double calcularTotalPrestaciones(double salarioBruto) {
+    return calcularPrimaServicios(salarioBruto)
+         + calcularCesantias(salarioBruto)
+         + calcularInteresesCesantias(salarioBruto)
+         + calcularPrimaNavidad(salarioBruto)
+         + calcularVacaciones(salarioBruto)
+         + calcularPrimaVacaciones(salarioBruto)
+         + calcularBonificacionServicios(salarioBruto);
+}
+
+AportesPatronales calcularAportesPatronales(double salarioBruto) {
+    AportesPatronales ap;
+    ap.pension = llround(salarioBruto * TASA_PENSION_PATRONAL);
+    ap.salud   = llround(salarioBruto * TASA_SALUD_PATRONAL);
+    ap.arl     = llround(salarioBruto * TASA_ARL);
+    ap.caja    = llround(salarioBruto * TASA_CAJA_COMP);
+    ap.total   = ap.pension + ap.salud + ap.arl + ap.caja;
+    return ap;
+}
+
+double calcularCostoTotalEmpleador(const Profesor& p) {
+    double bruto = calcularSalarioBruto(p);
+    return bruto + calcularAportesPatronales(bruto).total;
 }
 
 void imprimirDesgloseNomina(const Profesor& p) {
-    double bruto = calcularSalarioBruto(p);
-    cout << fixed << setprecision(2);
-    cout << "\n===== Desglose de nomina: " << p.nombreCompleto << " =====\n";
-    cout << "Tipo de vinculacion   : " << p.tipoVinculacion << "\n";
+    cout << fixed << setprecision(0);
+    cout << "\n=================================================================\n";
+    cout << "      DESPRENDIBLE OFICIAL DE PAGO DE NOMINA DOCENTE (UPC)       \n";
+    cout << "=================================================================\n";
+    cout << "Docente               : " << p.nombreCompleto << " (ID: " << p.identificacion << ")\n";
+    cout << "Modalidad / Regimen   : " << p.tipoVinculacion << " (" << observacionNormativa(p) << ")\n";
     cout << "Dedicacion            : " << p.dedicacion << "\n";
-    cout << "Categoria escalafon   : " << p.categoriaEscalafon
-         << " (" << puntosPorCategoria(p.categoriaEscalafon) << " puntos)\n";
-    cout << "Puntos por titulos    : " << p.puntosTitulos << "\n";
-    cout << "Puntos productividad  : " << p.puntosProductividad << "\n";
-    cout << "Total puntos          : " << totalPuntos(p) << "\n";
-    cout << "Valor del punto       : $" << VALOR_PUNTO << "\n";
-    cout << "Factor proporcional   : " << factorProporcionalidad(p) << "\n";
-    cout << "------------------------------------------\n";
-    cout << "Salario bruto         : $" << bruto << "\n";
-    cout << "(-) Salud (4%)        : $" << calcularDescuentoSalud(bruto) << "\n";
-    cout << "(-) Pension (4%)      : $" << calcularDescuentoPension(bruto) << "\n";
-    cout << "Salario neto          : $" << calcularSalarioNeto(p) << "\n";
-    cout << "------------------------------------------\n";
-    cout << "Prima (informativo)   : $" << calcularPrimaServicios(bruto) << "\n";
-    cout << "Cesantias (informativo): $" << calcularCesantias(bruto) << "\n";
-    cout << "===========================================\n";
+
+    if (!liquidacionDisponible(p)) {
+        cout << "\n[!] SALARIO NO LIQUIDADO: Falta resolucion rectoral de hora catedra.\n";
+        cout << "=================================================================\n";
+        return;
+    }
+
+    double bruto = calcularSalarioBruto(p);
+    long long salud = calcularDescuentoSalud(bruto);
+    long long pension = calcularDescuentoPension(bruto);
+    long long fsp = calcularDescuentoFSP(bruto);
+    long long totalDed = salud + pension + fsp;
+    double neto = bruto - totalDed;
+    AportesPatronales ap = calcularAportesPatronales(bruto);
+    double costoUpc = bruto + ap.total;
+
+    cout << "\n--- DEVENGADOS Y ASIGNACIONES (+) ---\n";
+    if (p.tipoVinculacion == "Planta") {
+        cout << "Asignacion Basica     : $" << bruto << " COP (" << totalPuntos(p) << " pts x $" << VALOR_PUNTO << ")\n";
+    } else {
+        cout << "Asignacion Basica     : $" << bruto << " COP\n";
+    }
+
+    cout << "\n--- DEDUCCIONES OBLIGATORIAS DE LEY (-) [Total: -$" << totalDed << " COP] ---\n";
+    cout << "IBC Seguridad Social  : $" << bruto << " COP\n";
+    cout << "(-) Salud (4%)        : -$" << salud << " COP\n";
+    cout << "(-) Pension (4%)      : -$" << pension << " COP\n";
+    if (fsp > 0) {
+        cout << "(-) FSP (1%)          : -$" << fsp << " COP (salario >= 4 SMMLV)\n";
+    } else {
+        cout << "    FSP (1%)          : $0 COP (no supera 4 SMMLV)\n";
+    }
+
+    cout << "\n--- COSTO TOTAL EMPLEADOR (UPC) [Total: $" << costoUpc << " COP] ---\n";
+    cout << "Asignacion Basica     : $" << bruto << " COP\n";
+    cout << "Salud Patronal (8.5%) : $" << ap.salud << " COP\n";
+    cout << "Pension Patronal (12%): $" << ap.pension << " COP\n";
+    cout << "ARL (0.522%)          : $" << ap.arl << " COP\n";
+    cout << "Caja Compensacion (4%): $" << ap.caja << " COP\n";
+
+    cout << "\n--- PROVISION PRESTACIONAL MENSUAL (LEYES 52/1975, 1042/1978, DTO 1279) ---\n";
+    cout << "Prima de Servicios    : $" << calcularPrimaServicios(bruto) << " COP\n";
+    cout << "Cesantias             : $" << calcularCesantias(bruto) << " COP\n";
+    cout << "Intereses Cesantias   : $" << calcularInteresesCesantias(bruto) << " COP\n";
+    cout << "Prima de Navidad      : $" << calcularPrimaNavidad(bruto) << " COP\n";
+    cout << "Vacaciones            : $" << calcularVacaciones(bruto) << " COP\n";
+    cout << "Prima de Vacaciones   : $" << calcularPrimaVacaciones(bruto) << " COP\n";
+    cout << "Bonif. de Servicios   : $" << calcularBonificacionServicios(bruto) << " COP\n";
+    cout << "TOTAL Prestaciones    : $" << calcularTotalPrestaciones(bruto) << " COP\n";
+
+    cout << "\n=================================================================\n";
+    cout << ">>> NETO A PAGAR DOCENTE: $" << neto << " COP <<<\n";
+    cout << "=================================================================\n";
+}
+
+// ── Administrativos ──
+
+double salarioBaseAdministrativo(const string& categoria) {
+    if (categoria == "Nivel 2") return 2800000.0;
+    if (categoria == "Nivel 3") return 3750000.0;
+    if (categoria == "Nivel 4") return 5050000.0;
+    return 1950000.0; // Nivel 1 por defecto
+}
+
+double calcularSalarioBrutoAdmin(const Administrativo& a) {
+    if (a.salarioBase > 0) return a.salarioBase;
+    return salarioBaseAdministrativo(a.categoria);
+}
+
+long long calcularDescuentoSaludAdmin(double salarioBruto) {
+    return llround(salarioBruto * 0.04);
+}
+
+long long calcularDescuentoPensionAdmin(double salarioBruto) {
+    return llround(salarioBruto * 0.04);
+}
+
+long long calcularDescuentoFSPAdmin(double salarioBruto) {
+    if (salarioBruto >= (4.0 * SMMLV)) {
+        return llround(salarioBruto * 0.01);
+    }
+    return 0;
+}
+
+double calcularSalarioNetoAdmin(const Administrativo& a) {
+    double bruto = calcularSalarioBrutoAdmin(a);
+    return bruto - calcularDescuentoSaludAdmin(bruto)
+                 - calcularDescuentoPensionAdmin(bruto)
+                 - calcularDescuentoFSPAdmin(bruto);
+}
+
+AportesPatronales calcularAportesPatronalesAdmin(double salarioBruto) {
+    return calcularAportesPatronales(salarioBruto);
+}
+
+double calcularCostoTotalAdmin(const Administrativo& a) {
+    double bruto = calcularSalarioBrutoAdmin(a);
+    return bruto + calcularAportesPatronalesAdmin(bruto).total;
+}
+
+void imprimirDesgloseNominaAdmin(const Administrativo& a) {
+    cout << fixed << setprecision(0);
+    cout << "\n=================================================================\n";
+    cout << "    DESPRENDIBLE OFICIAL DE PAGO PERSONAL ADMINISTRATIVO (UPC)   \n";
+    cout << "=================================================================\n";
+    cout << "Funcionario           : " << a.nombreCompleto << " (ID: " << a.identificacion << ")\n";
+    cout << "Cargo / Nivel         : " << a.cargo << " (" << a.categoria << ")\n";
+    cout << "Tipo de Contratacion  : " << a.tipoContratacion << "\n";
+    cout << "Adscrito a            : " << (a.codigoFacultad.empty() ? "Nivel Central" : a.codigoFacultad) << "\n";
+
+    double bruto = calcularSalarioBrutoAdmin(a);
+    long long salud = calcularDescuentoSaludAdmin(bruto);
+    long long pension = calcularDescuentoPensionAdmin(bruto);
+    long long fsp = calcularDescuentoFSPAdmin(bruto);
+    long long totalDed = salud + pension + fsp;
+    double neto = bruto - totalDed;
+    AportesPatronales ap = calcularAportesPatronalesAdmin(bruto);
+    double costoUpc = bruto + ap.total;
+
+    cout << "\n--- DEVENGADOS Y ASIGNACIONES (+) ---\n";
+    cout << "Asignacion Salarial   : $" << bruto << " COP (" << a.categoria << " - Decretos Salariales 2026)\n";
+
+    cout << "\n--- DEDUCCIONES OBLIGATORIAS DE LEY (-) [Total: -$" << totalDed << " COP] ---\n";
+    cout << "IBC Seguridad Social  : $" << bruto << " COP\n";
+    cout << "(-) Salud (4%)        : -$" << salud << " COP\n";
+    cout << "(-) Pension (4%)      : -$" << pension << " COP\n";
+    if (fsp > 0) {
+        cout << "(-) FSP (1%)          : -$" << fsp << " COP (salario >= 4 SMMLV)\n";
+    } else {
+        cout << "    FSP (1%)          : $0 COP (no supera 4 SMMLV)\n";
+    }
+
+    cout << "\n--- COSTO TOTAL EMPLEADOR (UPC) [Total: $" << costoUpc << " COP] ---\n";
+    cout << "Asignacion Basica     : $" << bruto << " COP\n";
+    cout << "Salud Patronal (8.5%) : $" << ap.salud << " COP\n";
+    cout << "Pension Patronal (12%): $" << ap.pension << " COP\n";
+    cout << "ARL (0.522%)          : $" << ap.arl << " COP\n";
+    cout << "Caja Compensacion (4%): $" << ap.caja << " COP\n";
+
+    cout << "\n=================================================================\n";
+    cout << ">>> NETO A PAGAR FUNCIONARIO: $" << neto << " COP <<<\n";
+    cout << "=================================================================\n";
 }

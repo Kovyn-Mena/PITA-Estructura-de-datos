@@ -240,7 +240,8 @@ void menuAdministrativos(vector<Administrativo>& admins, vector<Facultad>& facul
     do {
         limpiarPantalla();
         cout << "\n--- Menu Administrativos ---\n";
-        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n0. Volver (o presione ENTER)\n";
+        cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n";
+        cout << "6. Ver liquidacion de nomina\n0. Volver (o presione ENTER)\n";
         opcion = leerOpcionInmediata("Opcion: ");
 
         string id;
@@ -266,6 +267,17 @@ void menuAdministrativos(vector<Administrativo>& admins, vector<Facultad>& facul
                 }
                 pausar();
                 break;
+            case 6: {
+                cout << "Identificacion del administrativo: "; cin >> id;
+                Administrativo* a = buscarAdministrativo(admins, id);
+                if (a) {
+                    imprimirDesgloseNominaAdmin(*a);
+                } else {
+                    cout << "Administrativo no encontrado.\n";
+                }
+                pausar();
+                break;
+            }
             case 0: break;
             default: cout << "Opcion invalida.\n"; pausar();
         }

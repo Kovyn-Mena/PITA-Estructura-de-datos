@@ -5,6 +5,7 @@ para el siguiente bloque de Python."""
 
 from entidades import Facultad, Programa, Curso, Estudiante, Profesor, Administrativo
 from interfaz import leer_palabra, es_cancelar, leer_entero, leer_si_no
+from nomina import salario_base_administrativo
 
 
 # ============================ FACULTADES ============================
@@ -549,12 +550,15 @@ def crear_administrativo(admins, facultades):
         return
     tipo_contratacion = tipos[opcion_tipo]
 
+    print("Salario base (0 para asignar segun escala legal):")
     salario_base = leer_entero("Salario base: ")
+    if salario_base <= 0:
+        salario_base = int(salario_base_administrativo(categoria))
 
     admins.append(Administrativo(identificacion, nombre, cargo, categoria,
-                                  tipo_contratacion, salario_base,
+                                  tipo_contratacion, float(salario_base),
                                   codigo_facultad, activo=True))
-    print("Administrativo creado correctamente.")
+    print(f"Administrativo creado correctamente con salario base de ${salario_base:,.0f} COP.")
 
 
 def listar_administrativos(admins):
