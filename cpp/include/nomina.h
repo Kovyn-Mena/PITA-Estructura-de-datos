@@ -14,13 +14,18 @@ int totalPuntos(const Profesor& p);
 double factorProporcionalidad(const Profesor& p);
 double factorOcasional(const Profesor& p);
 double calcularSalarioBruto(const Profesor& p);
+long long calcularBonificacionPosgrado(const Profesor& p);
+double calcularTotalDevengado(const Profesor& p);
 bool liquidacionDisponible(const Profesor& p);
 std::string observacionNormativa(const Profesor& p);
 
-// Descuentos empleado (redondeo a pesos enteros según Decreto 1990/2016)
+// Descuentos empleado (redondeo a pesos enteros / PILA según Decreto 1990/2016)
 long long calcularDescuentoSalud(double salarioBruto);
 long long calcularDescuentoPension(double salarioBruto);
 long long calcularDescuentoFSP(double salarioBruto);
+long long calcularDescuentoEstampilla(double salarioBruto);
+long long calcularRetencionFuente(double totalDevengado, long long salud, long long pension);
+long long calcularTotalDeducciones(const Profesor& p);
 double calcularSalarioNeto(const Profesor& p);
 
 // Prestaciones sociales (provisión mensual)

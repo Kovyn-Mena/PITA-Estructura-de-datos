@@ -140,12 +140,13 @@ def cargar_estudiantes(ruta_est, ruta_matriculas):
 def guardar_profesores(profesores, ruta):
     with open(ruta, "w", encoding="utf-8") as archivo:
         for p in profesores:
+            posg = getattr(p, "posgrado", "")
             archivo.write(
                 f"{p.identificacion}|{p.nombre_completo}|{p.codigo_programa}|"
                 f"{p.tipo_vinculacion}|{p.dedicacion}|{p.categoria_escalafon}|"
                 f"{p.horas_catedra_semanales}|{1 if p.ad_honorem else 0}|"
                 f"{p.anios_experiencia}|{p.puntos_titulos}|{p.puntos_productividad}|"
-                f"{1 if p.activo else 0}\n"
+                f"{1 if p.activo else 0}|{posg}\n"
             )
 
 
@@ -174,6 +175,7 @@ def cargar_profesores(ruta):
                 puntos_titulos=int(campos[9]),
                 puntos_productividad=int(campos[10]),
                 activo=(campos[11] == "1"),
+                posgrado=campos[12] if len(campos) >= 13 else "",
             ))
     return resultado
 

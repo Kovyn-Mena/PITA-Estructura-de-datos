@@ -62,7 +62,7 @@ class Profesor:
                  tipo_vinculacion, dedicacion, categoria_escalafon="",
                  horas_catedra_semanales=0, ad_honorem=False,
                  anios_experiencia=0, puntos_titulos=0, puntos_productividad=0,
-                 activo=True):
+                 activo=True, posgrado=""):
         self.identificacion = identificacion
         self.nombre_completo = nombre_completo
         self.codigo_programa = codigo_programa
@@ -75,6 +75,7 @@ class Profesor:
         self.puntos_titulos = puntos_titulos
         self.puntos_productividad = puntos_productividad
         self.activo = activo
+        self.posgrado = posgrado  # Ninguno, Especializacion, Maestria, Doctorado
 
 
 class Administrativo:

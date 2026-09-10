@@ -51,24 +51,48 @@ double factorOcasional(const Profesor& p) {
     return 0.0;
 }
 
+static const double TASA_ESTAMPILLA = 0.002;
+
+double factorBonificacionPosgrado(const string& posgrado) {
+    if (posgrado == "Especializacion") return 0.10;
+    if (posgrado == "Maestria")        return 0.45;
+    if (posgrado == "Doctorado")       return 0.90;
+    return 0.0;
+}
+
 double calcularSalarioBruto(const Profesor& p) {
     if (p.adHonorem) return 0.0;
 
     if (p.tipoVinculacion == "Planta") {
-        return totalPuntos(p) * VALOR_PUNTO * factorProporcionalidad(p);
+        return llround(totalPuntos(p) * VALOR_PUNTO * factorProporcionalidad(p));
     }
 
     if (p.tipoVinculacion == "Ocasional") {
-        return factorOcasional(p) * SMMLV;
+        return llround(factorOcasional(p) * SMMLV);
     }
 
     if (p.tipoVinculacion == "Catedratico") {
         if (VALOR_HORA_CATEDRA <= 0.0) return 0.0;
         double horasMensualesEstimadas = p.horasCatedraSemanales * 4.0;
-        return horasMensualesEstimadas * VALOR_HORA_CATEDRA;
+        return llround(horasMensualesEstimadas * VALOR_HORA_CATEDRA);
     }
 
     return 0.0;
+}
+
+long long calcularBonificacionPosgrado(const Profesor& p) {
+    if (p.adHonorem || p.tipoVinculacion == "Planta") return 0;
+    double factor = factorBonificacionPosgrado(p.posgrado);
+    if (factor <= 0.0) return 0;
+    if (p.tipoVinculacion == "Catedratico") {
+        double horas = p.horasCatedraSemanales * 4.0;
+        return llround((factor * SMMLV) * (horas / 40.0));
+    }
+    return llround(factor * SMMLV);
+}
+
+double calcularTotalDevengado(const Profesor& p) {
+    return calcularSalarioBruto(p) + calcularBonificacionPosgrado(p);
 }
 
 bool liquidacionDisponible(const Profesor& p) {
@@ -81,7 +105,10 @@ bool liquidacionDisponible(const Profesor& p) {
 string observacionNormativa(const Profesor& p) {
     if (p.adHonorem) return "Ad-honorem: sin remuneracion (Acuerdo 027/2024).";
     if (p.tipoVinculacion == "Planta") return "Planta: Decreto 1279/2002.";
-    if (p.tipoVinculacion == "Ocasional") return "Ocasional: Acuerdo UPC 027/2024, art. 24.";
+    if (p.tipoVinculacion == "Ocasional") {
+        string det = p.posgrado.empty() ? "" : " con bonificacion por " + p.posgrado + " (Acuerdo 027/2024)";
+        return "Ocasional: Acuerdo UPC 027/2024, art. 24" + det + ".";
+    }
     if (p.tipoVinculacion == "Catedratico") {
         if (VALOR_HORA_CATEDRA <= 0.0)
             return "Catedratico: pendiente resolucion rectoral vigente de valor hora (Acuerdo 027/2024).";
@@ -91,25 +118,47 @@ string observacionNormativa(const Profesor& p) {
 }
 
 long long calcularDescuentoSalud(double salarioBruto) {
-    return llround(salarioBruto * 0.04);
+    return llround((salarioBruto * 0.04) / 100.0) * 100;
 }
 
 long long calcularDescuentoPension(double salarioBruto) {
-    return llround(salarioBruto * 0.04);
+    return llround((salarioBruto * 0.04) / 100.0) * 100;
 }
 
 long long calcularDescuentoFSP(double salarioBruto) {
     if (salarioBruto >= (4.0 * SMMLV)) {
-        return llround(salarioBruto * 0.01);
+        return llround((salarioBruto * 0.01) / 100.0) * 100;
     }
     return 0;
 }
 
-double calcularSalarioNeto(const Profesor& p) {
+long long calcularDescuentoEstampilla(double salarioBruto) {
+    return llround(salarioBruto * TASA_ESTAMPILLA);
+}
+
+long long calcularRetencionFuente(double totalDevengado, long long salud, long long pension) {
+    double baseGravable = (totalDevengado - salud - pension) * 0.75;
+    double umbral = 4975000.0; // Umbral de 95 UVT (2026)
+    if (baseGravable > umbral) {
+        double impuesto = (baseGravable - umbral) * 0.19;
+        return llround(impuesto / 1000.0) * 1000;
+    }
+    return 0;
+}
+
+long long calcularTotalDeducciones(const Profesor& p) {
     double bruto = calcularSalarioBruto(p);
-    return bruto - calcularDescuentoSalud(bruto)
-                 - calcularDescuentoPension(bruto)
-                 - calcularDescuentoFSP(bruto);
+    double devengado = calcularTotalDevengado(p);
+    long long salud = calcularDescuentoSalud(bruto);
+    long long pension = calcularDescuentoPension(bruto);
+    long long fsp = calcularDescuentoFSP(bruto);
+    long long estampilla = calcularDescuentoEstampilla(bruto);
+    long long retencion = calcularRetencionFuente(devengado, salud, pension);
+    return salud + pension + fsp + estampilla + retencion;
+}
+
+double calcularSalarioNeto(const Profesor& p) {
+    return calcularTotalDevengado(p) - calcularTotalDeducciones(p);
 }
 
 double calcularPrimaServicios(double salarioBruto) {
@@ -173,6 +222,9 @@ void imprimirDesgloseNomina(const Profesor& p) {
     cout << "Docente               : " << p.nombreCompleto << " (ID: " << p.identificacion << ")\n";
     cout << "Modalidad / Regimen   : " << p.tipoVinculacion << " (" << observacionNormativa(p) << ")\n";
     cout << "Dedicacion            : " << p.dedicacion << "\n";
+    if (!p.posgrado.empty()) {
+        cout << "Cualificacion Postg.  : " << p.posgrado << "\n";
+    }
 
     if (!liquidacionDisponible(p)) {
         cout << "\n[!] SALARIO NO LIQUIDADO: Falta resolucion rectoral de hora catedra.\n";
@@ -181,47 +233,43 @@ void imprimirDesgloseNomina(const Profesor& p) {
     }
 
     double bruto = calcularSalarioBruto(p);
+    long long bonifPosg = calcularBonificacionPosgrado(p);
+    double devengado = calcularTotalDevengado(p);
+
     long long salud = calcularDescuentoSalud(bruto);
     long long pension = calcularDescuentoPension(bruto);
     long long fsp = calcularDescuentoFSP(bruto);
-    long long totalDed = salud + pension + fsp;
-    double neto = bruto - totalDed;
+    long long estampilla = calcularDescuentoEstampilla(bruto);
+    long long retencion = calcularRetencionFuente(devengado, salud, pension);
+    long long totalDed = salud + pension + fsp + estampilla + retencion;
+    double neto = devengado - totalDed;
     AportesPatronales ap = calcularAportesPatronales(bruto);
-    double costoUpc = bruto + ap.total;
 
     cout << "\n--- DEVENGADOS Y ASIGNACIONES (+) ---\n";
-    if (p.tipoVinculacion == "Planta") {
-        cout << "Asignacion Basica     : $" << bruto << " COP (" << totalPuntos(p) << " pts x $" << VALOR_PUNTO << ")\n";
-    } else {
-        cout << "Asignacion Basica     : $" << bruto << " COP\n";
+    cout << "SUELDO (Basico)       : $" << bruto << " COP\n";
+    if (bonifPosg > 0) {
+        cout << "BONIF. CUALIF. POSTG. : $" << bonifPosg << " COP (Acuerdo UPC 027/2024)\n";
     }
+    cout << "Total Devengados      : $" << devengado << " COP\n";
 
-    cout << "\n--- DEDUCCIONES OBLIGATORIAS DE LEY (-) [Total: -$" << totalDed << " COP] ---\n";
-    cout << "IBC Seguridad Social  : $" << bruto << " COP\n";
-    cout << "(-) Salud (4%)        : -$" << salud << " COP\n";
-    cout << "(-) Pension (4%)      : -$" << pension << " COP\n";
+    cout << "\n--- DEDUCIDOS (-) [Total Deducciones: -$" << totalDed << " COP] ---\n";
+    cout << "DESCUENTO ESTAMPILLA  : -$" << estampilla << " COP (0.2% Pro-UPC)\n";
+    if (retencion > 0) {
+        cout << "RETENCION EN LA FUENTE: -$" << retencion << " COP (Art. 383 E.T.)\n";
+    }
+    cout << "APORTE PENSION EMPL.  : -$" << pension << " COP (4% base sueldo, PILA)\n";
+    cout << "APORTE SALUD EMPLEADO : -$" << salud << " COP (4% base sueldo, PILA)\n";
     if (fsp > 0) {
-        cout << "(-) FSP (1%)          : -$" << fsp << " COP (salario >= 4 SMMLV)\n";
-    } else {
-        cout << "    FSP (1%)          : $0 COP (no supera 4 SMMLV)\n";
+        cout << "FONDO SOLIDARIDAD PENS: -$" << fsp << " COP (1% IBC >= 4 SMMLV)\n";
     }
+    cout << "Total Deducidos       : -$" << totalDed << " COP\n";
 
-    cout << "\n--- COSTO TOTAL EMPLEADOR (UPC) [Total: $" << costoUpc << " COP] ---\n";
-    cout << "Asignacion Basica     : $" << bruto << " COP\n";
-    cout << "Salud Patronal (8.5%) : $" << ap.salud << " COP\n";
+    cout << "\n--- APORTES PATRONALES (COSTO INSTITUCIONAL UPC) ---\n";
     cout << "Pension Patronal (12%): $" << ap.pension << " COP\n";
+    cout << "Salud Patronal (8.5%) : $" << ap.salud << " COP\n";
     cout << "ARL (0.522%)          : $" << ap.arl << " COP\n";
     cout << "Caja Compensacion (4%): $" << ap.caja << " COP\n";
-
-    cout << "\n--- PROVISION PRESTACIONAL MENSUAL (LEYES 52/1975, 1042/1978, DTO 1279) ---\n";
-    cout << "Prima de Servicios    : $" << calcularPrimaServicios(bruto) << " COP\n";
-    cout << "Cesantias             : $" << calcularCesantias(bruto) << " COP\n";
-    cout << "Intereses Cesantias   : $" << calcularInteresesCesantias(bruto) << " COP\n";
-    cout << "Prima de Navidad      : $" << calcularPrimaNavidad(bruto) << " COP\n";
-    cout << "Vacaciones            : $" << calcularVacaciones(bruto) << " COP\n";
-    cout << "Prima de Vacaciones   : $" << calcularPrimaVacaciones(bruto) << " COP\n";
-    cout << "Bonif. de Servicios   : $" << calcularBonificacionServicios(bruto) << " COP\n";
-    cout << "TOTAL Prestaciones    : $" << calcularTotalPrestaciones(bruto) << " COP\n";
+    cout << "Costo Total Empleador : $" << calcularCostoTotalEmpleador(p) << " COP\n";
 
     cout << "\n=================================================================\n";
     cout << ">>> NETO A PAGAR DOCENTE: $" << neto << " COP <<<\n";

@@ -1,66 +1,8 @@
-C0101|Fundamentos de Administracion|3|P001|ADM|1
-C0102|Gestion Organizacional|4|P002|ADM|1
-C0103|Mercadeo|2|P045|ADM|1
-C0201|Gestion Turistica|4|P003|AEH|1
-C0202|Administracion Hotelera|2|P004|AEH|1
-C0203|Gastronomia y Servicios|3|P051|AEH|1
-C0301|Fundamentos de Comercio|2|P005|COM|1
-C0302|Logistica Internacional|3|P006|COM|1
-C0303|Negociacion Internacional|4|P005|COM|1
-C0401|Contabilidad Financiera I|3|P007|CP|1
-C0402|Costos I|4|P008|CP|1
-C0403|Tributaria|2|P007|CP|1
-C0501|Microeconomia|4|P009|ECO|1
-C0502|Macroeconomia|2|P010|ECO|1
-C0503|Econometria|3|P009|ECO|1
-C0601|Procesos Agroindustriales|2|P011|AGR|1
-C0602|Balance de Materia|3|P012|AGR|1
-C0603|Operaciones Unitarias|4|P011|AGR|1
-C0701|Quimica Ambiental|3|P013|AMB|1
-C0702|Gestion Ambiental|4|P014|AMB|1
-C0703|Saneamiento Basico|2|P052|AMB|1
-C0801|Estructura de Datos|4|P015|SIS|1
-C0802|Programacion I|2|P016|SIS|1
-C0803|Bases de Datos|3|P046|SIS|1
-C0901|Circuitos I|2|P017|ELE|1
-C0902|Electronica Analogica|3|P018|ELE|1
-C0903|Sistemas Digitales|4|P017|ELE|1
-C1001|Fundamentos de Enfermeria|3|P019|ENF|1
-C1002|Anatomia y Fisiologia|4|P020|ENF|1
-C1003|Salud Publica|2|P047|ENF|1
-C1101|Anatomia Quirurgica|4|P021|IQ|1
-C1102|Instrumentacion I|2|P022|IQ|1
-C1103|Bioseguridad|3|P021|IQ|1
-C1201|Microbiologia General|2|P023|MIB|1
-C1202|Genetica Microbiana|3|P024|MIB|1
-C1203|Inmunologia|4|P023|MIB|1
-C1301|Introduccion al Derecho|3|P025|DER|1
-C1302|Derecho Constitucional|4|P026|DER|1
-C1303|Derecho Civil|2|P048|DER|1
-C1401|Psicologia General|4|P027|PSI|1
-C1402|Psicologia del Desarrollo|2|P028|PSI|1
-C1403|Psicometria|3|P027|PSI|1
-C1501|Introduccion a la Sociologia|2|P029|SOC|1
-C1502|Sociologia Colombiana|3|P030|SOC|1
-C1503|Metodos de Investigacion Social|4|P029|SOC|1
-C1601|Historia del Arte|3|P031|ART|1
-C1602|Taller de Creacion|4|P032|ART|1
-C1603|Estetica|2|P031|ART|1
-C1701|Teoria Musical|4|P033|MUS|1
-C1702|Armonia|2|P034|MUS|1
-C1703|Ensamble Musical|3|P049|MUS|1
-C1801|Calculo Diferencial|2|P035|MAT|1
-C1802|Algebra Lineal|3|P036|MAT|1
-C1803|Geometria|4|P050|MAT|1
-C1901|English I|3|P037|LEI|1
-C1902|Linguistica|4|P038|LEI|1
-C1903|Didactica del Ingles|2|P037|LEI|1
-C2001|Literatura Colombiana|4|P039|LLC|1
-C2002|Lengua Castellana|2|P040|LLC|1
-C2003|Critica Literaria|3|P039|LLC|1
-C2101|Anatomia Funcional|2|P041|EDF|1
-C2102|Pedagogia del Deporte|3|P042|EDF|1
-C2103|Entrenamiento Deportivo|4|P041|EDF|1
-C2201|Biologia General|3|P043|CNA|1
-C2202|Educacion Ambiental|4|P044|CNA|1
-C2203|Didactica de las Ciencias|2|P043|CNA|1
+C0801|Estructura de Datos|4|79985291|SIS|1
+C0802|Programacion I|3|P001|SIS|1
+C0803|Bases de Datos|3|P002|SIS|1
+C0804|Sistemas Operativos|3|P004|SIS|1
+C0805|Redes de Computadores|3|P005|SIS|1
+C0806|Ingenieria de Software|3|P003|SIS|1
+C0807|Seminario de Investigacion|2|P006|SIS|1
+C0808|Electiva Profesional|2|P007|SIS|0

@@ -53,6 +53,16 @@ FACTORES_OCASIONAL_SMMLV = {
     ("Titular", "MedioTiempo"): 2.146,
 }
 
+# Acuerdo UPC 027 de 2024: Bonificación económica mensual por cualificación en postgrado
+FACTORES_BONIFICACION_POSGRADO = {
+    "Especializacion": 0.10,
+    "Maestria": 0.45,
+    "Doctorado": 0.90,
+}
+
+# Estampilla Pro-Universidad Popular del Cesar (0.2% sobre salario básico)
+TASA_ESTAMPILLA = 0.002
+
 # Acuerdo 027/2024 art. 23 ordena que el Rector fije por resolución el valor
 # de la hora cátedra. Se deja configurable para no presentar como vigente un
 # valor antiguo o proyectado. Puede cargarse cuando se tenga la resolución.
@@ -178,24 +188,54 @@ def factor_ocasional(profesor):
     )
 
 
+def redondear_pesos(valor):
+    """Redondeo aritmético estándar al peso entero más cercano."""
+    return round((valor or 0.0) + 1e-6)
+
+
 def calcular_salario_bruto(profesor):
     if profesor.ad_honorem:
         return 0.0
 
     if profesor.tipo_vinculacion == "Planta":
-        return total_puntos(profesor) * VALOR_PUNTO * factor_proporcionalidad(profesor)
+        return redondear_pesos(total_puntos(profesor) * VALOR_PUNTO * factor_proporcionalidad(profesor))
 
     if profesor.tipo_vinculacion == "Ocasional":
         factor = factor_ocasional(profesor)
-        return (factor * SMMLV) if factor is not None else 0.0
+        return redondear_pesos(factor * SMMLV) if factor is not None else 0.0
 
     if profesor.tipo_vinculacion == "Catedratico":
         if VALOR_HORA_CATEDRA is None:
             return 0.0
         horas_mensuales_estimadas = profesor.horas_catedra_semanales * 4.0
-        return horas_mensuales_estimadas * VALOR_HORA_CATEDRA
+        return redondear_pesos(horas_mensuales_estimadas * VALOR_HORA_CATEDRA)
 
     return 0.0
+
+
+def calcular_bonificacion_posgrado(profesor):
+    """Bonificación mensual adicional por cualificación en postgrado.
+
+    Acuerdo UPC 027 de 2024 (Especialización: 0.10 SMMLV, Maestría: 0.45 SMMLV,
+    Doctorado: 0.90 SMMLV).
+    Aplica a docentes ocasionales y catedráticos. No constituye factor salarial
+    para la liquidación de prestaciones sociales ni parafiscales.
+    """
+    if getattr(profesor, "ad_honorem", False) or profesor.tipo_vinculacion == "Planta":
+        return 0.0
+    posgrado = getattr(profesor, "posgrado", "")
+    factor = FACTORES_BONIFICACION_POSGRADO.get(posgrado, 0.0)
+    if factor <= 0.0:
+        return 0.0
+    if profesor.tipo_vinculacion == "Catedratico":
+        horas = getattr(profesor, "horas_catedra_semanales", 0) * 4.0
+        return redondear_pesos((factor * SMMLV) * (horas / 40.0))
+    return redondear_pesos(factor * SMMLV)
+
+
+def calcular_total_devengado(profesor):
+    """Total devengado mensual = Salario básico + Bonificación por postgrado."""
+    return calcular_salario_bruto(profesor) + calcular_bonificacion_posgrado(profesor)
 
 
 def liquidacion_disponible(profesor):
@@ -216,9 +256,10 @@ def observacion_normativa(profesor):
                 "automáticamente en puntos porque el art. 9 exige valoración según el tipo "
                 "de experiencia. Los puntos guardados se tratan como ya reconocidos.")
     if profesor.tipo_vinculacion == "Ocasional":
-        return ("Ocasional: salario base según categoría y dedicación del art. 24 del "
-                "Acuerdo UPC 027/2024. No se suman bonificaciones de posgrado o grupo "
-                "de investigación porque esos datos no existen en el modelo actual.")
+        posg = getattr(profesor, "posgrado", "")
+        det_posg = f" con bonificación por {posg} (Acuerdo 027/2024)" if posg else ""
+        return (f"Ocasional: salario base según categoría y dedicación del art. 24 del "
+                f"Acuerdo UPC 027/2024{det_posg}.")
     if profesor.tipo_vinculacion == "Catedratico":
         if VALOR_HORA_CATEDRA is None:
             return ("Catedrático: el art. 23 del Acuerdo UPC 027/2024 exige usar el valor "
@@ -229,35 +270,66 @@ def observacion_normativa(profesor):
 
 
 # ── Descuentos del empleado ──────────────────────────────────────────────────
-# Los aportes a seguridad social se redondean a pesos enteros (Decreto 1990/2016).
+# Conforme a la plataforma PILA y Decreto 1990/2016, los aportes a seguridad social
+# se aproximan al múltiplo de 100 más cercano.
 
 def calcular_descuento_salud(salario_bruto):
-    """4 % a cargo del empleado — Ley 100/1993, art. 204."""
-    return round((salario_bruto or 0.0) * 0.04)
+    """4 % a cargo del empleado — Ley 100/1993 art. 204 (redondeo a centena PILA)."""
+    b = salario_bruto or 0.0
+    return round(((b * 0.04) / 100.0) + 1e-6) * 100
 
 
 def calcular_descuento_pension(salario_bruto):
-    """4 % a cargo del empleado — Ley 100/1993, art. 20."""
-    return round((salario_bruto or 0.0) * 0.04)
+    """4 % a cargo del empleado — Ley 100/1993 art. 20 (redondeo a centena PILA)."""
+    b = salario_bruto or 0.0
+    return round(((b * 0.04) / 100.0) + 1e-6) * 100
 
 
 def calcular_descuento_fsp(salario_bruto):
     """Fondo de Solidaridad Pensional (Ley 100/1993, Ley 797/2003).
 
-    Aplica a salarios iguales o superiores a 4 SMMLV (1%).
+    Aplica si el salario básico (IBC) es >= 4 SMMLV (1%).
     """
     b = salario_bruto or 0.0
     if b >= (4.0 * SMMLV):
-        return round(b * 0.01)
+        return round(((b * 0.01) / 100.0) + 1e-6) * 100
     return 0
 
 
-def calcular_salario_neto(profesor):
+def calcular_descuento_estampilla(salario_bruto):
+    """Descuento Estampilla Pro-UPC (0.2% sobre salario básico)."""
+    return redondear_pesos((salario_bruto or 0.0) * TASA_ESTAMPILLA)
+
+
+def calcular_retencion_fuente(total_devengado, salud, pension):
+    """Retención en la fuente por salarios (Art. 383 Estatuto Tributario).
+
+    Renta de trabajo con deducción del 25% exenta legal (Art. 206 num. 10 E.T.).
+    Aplica el 19% sobre el excedente del umbral de 95 UVT (~$4.975.000),
+    redondeado al múltiplo de 1.000 más cercano (norma DIAN).
+    """
+    base_gravable = ((total_devengado or 0.0) - salud - pension) * 0.75
+    umbral = 4975000.0  # Umbral de 95 UVT en 2026
+    if base_gravable > umbral:
+        impuesto = (base_gravable - umbral) * 0.19
+        return round((impuesto / 1000.0) + 1e-6) * 1000
+    return 0
+
+
+def calcular_total_deducciones(profesor):
+    """Suma de todas las deducciones de nómina del docente."""
     bruto = calcular_salario_bruto(profesor)
-    return (bruto
-            - calcular_descuento_salud(bruto)
-            - calcular_descuento_pension(bruto)
-            - calcular_descuento_fsp(bruto))
+    devengado = calcular_total_devengado(profesor)
+    salud = calcular_descuento_salud(bruto)
+    pension = calcular_descuento_pension(bruto)
+    fsp = calcular_descuento_fsp(bruto)
+    estampilla = calcular_descuento_estampilla(bruto)
+    retencion = calcular_retencion_fuente(devengado, salud, pension)
+    return salud + pension + fsp + estampilla + retencion
+
+
+def calcular_salario_neto(profesor):
+    return calcular_total_devengado(profesor) - calcular_total_deducciones(profesor)
 
 
 # ── Prestaciones sociales (provisión mensual) ────────────────────────────────
@@ -383,52 +455,59 @@ def calcular_costo_con_prestaciones(profesor):
 
 def imprimir_desglose_nomina(profesor):
     bruto = calcular_salario_bruto(profesor)
-    print(f"\n===== Desglose de nómina: {profesor.nombre_completo} =====")
-    print(f"Régimen               : {regimen_nomina(profesor)}")
-    print(f"Tipo de vinculación   : {profesor.tipo_vinculacion}")
+    bonif_posg = calcular_bonificacion_posgrado(profesor)
+    devengado = calcular_total_devengado(profesor)
+
+    salud = calcular_descuento_salud(bruto)
+    pension = calcular_descuento_pension(bruto)
+    fsp = calcular_descuento_fsp(bruto)
+    estampilla = calcular_descuento_estampilla(bruto)
+    retencion = calcular_retencion_fuente(devengado, salud, pension)
+    total_ded = salud + pension + fsp + estampilla + retencion
+    neto = devengado - total_ded
+
+    print(f"\n=================================================================")
+    print(f"      DESPRENDIBLE OFICIAL DE PAGO DE NOMINA DOCENTE (UPC)       ")
+    print(f"=================================================================")
+    print(f"Docente               : {profesor.nombre_completo} (ID: {profesor.identificacion})")
+    print(f"Modalidad / Régimen   : {profesor.tipo_vinculacion} ({regimen_nomina(profesor)})")
     print(f"Dedicación            : {profesor.dedicacion}")
+    if getattr(profesor, "posgrado", ""):
+        print(f"Cualificación Postg.  : {profesor.posgrado}")
 
-    if profesor.tipo_vinculacion == "Planta":
-        print(f"Pregrado base          : {PUNTOS_PREGRADO} puntos")
-        print(f"Categoría escalafón    : {profesor.categoria_escalafon} "
-              f"({puntos_por_categoria(profesor.categoria_escalafon)} puntos)")
-        print(f"Puntos títulos extra   : {profesor.puntos_titulos}")
-        print(f"Puntos productividad   : {profesor.puntos_productividad}")
-        print(f"Total puntos           : {total_puntos(profesor)}")
-        print(f"Valor punto 2026       : ${VALOR_PUNTO:,.2f}")
-    elif profesor.tipo_vinculacion == "Ocasional":
-        print(f"Factor SMMLV           : {factor_ocasional(profesor)}")
-        print(f"SMMLV 2026             : ${SMMLV:,.2f}")
-    elif profesor.tipo_vinculacion == "Catedratico":
-        print(f"Horas semanales        : {profesor.horas_catedra_semanales}")
-        print(f"Valor hora configurado : {VALOR_HORA_CATEDRA}")
+    if not liquidacion_disponible(profesor):
+        print("\n[!] SALARIO NO LIQUIDADO: Falta resolución rectoral de hora cátedra.")
+        print("=================================================================")
+        return
 
-    print("------------------------------------------")
-    if liquidacion_disponible(profesor):
-        ap = calcular_aportes_patronales(bruto)
-        print(f"Salario bruto          : ${bruto:,.0f}")
-        print(f"(-) Salud empleado (4%): ${calcular_descuento_salud(bruto):,}")
-        print(f"(-) Pensión empl. (4%) : ${calcular_descuento_pension(bruto):,}")
-        print(f"Salario neto           : ${calcular_salario_neto(profesor):,.0f}")
-        print("-- Prestaciones sociales (provisión mensual) --")
-        print(f"Prima de servicios     : ${calcular_prima_servicios(bruto):,.0f}")
-        print(f"Cesantías              : ${calcular_cesantias(bruto):,.0f}")
-        print(f"Intereses cesantías    : ${calcular_intereses_cesantias(bruto):,.0f}")
-        print(f"Prima de navidad       : ${calcular_prima_navidad(bruto):,.0f}")
-        print(f"Vacaciones             : ${calcular_vacaciones(bruto):,.0f}")
-        print(f"Prima de vacaciones    : ${calcular_prima_vacaciones(bruto):,.0f}")
-        print(f"Bonif. servicios       : ${calcular_bonificacion_servicios(bruto):,.0f}")
-        print("-- Aportes patronales (costo UPC) --")
-        print(f"Pensión patronal (12%) : ${ap['pension']:,}")
-        print(f"Salud patronal (8.5%)  : ${ap['salud']:,}")
-        print(f"ARL (0.522%)           : ${ap['arl']:,}")
-        print(f"Caja compensación (4%) : ${ap['caja']:,}")
-        print(f"Total aportes patronal : ${ap['total']:,}")
-        print(f"COSTO TOTAL EMPLEADOR  : ${calcular_costo_total_empleador(profesor):,.0f}")
-    else:
-        print("Salario                : NO LIQUIDADO (falta parámetro rectoral vigente)")
-    print("------------------------------------------")
+    print("\n--- DEVENGADOS Y ASIGNACIONES (+) ---")
+    print(f"SUELDO (Básico)       : ${bruto:,.0f} COP")
+    if bonif_posg > 0:
+        print(f"BONIF. CUALIF. POSTG. : ${bonif_posg:,.0f} COP (Acuerdo UPC 027/2024)")
+    print(f"Total Devengados      : ${devengado:,.0f} COP")
+
+    print(f"\n--- DEDUCIDOS (-) [Total Deducciones: ${total_ded:,.0f} COP] ---")
+    print(f"DESCUENTO ESTAMPILLA  : -${estampilla:,.0f} COP (0.2% Pro-UPC)")
+    if retencion > 0:
+        print(f"RETENCION EN LA FUENTE: -${retencion:,.0f} COP (Art. 383 E.T.)")
+    print(f"APORTE PENSION EMPL.  : -${pension:,.0f} COP (4% base sueldo, PILA)")
+    print(f"APORTE SALUD EMPLEADO : -${salud:,.0f} COP (4% base sueldo, PILA)")
+    if fsp > 0:
+        print(f"FONDO SOLIDARIDAD PENS: -${fsp:,.0f} COP (1% IBC >= 4 SMMLV)")
+    print(f"Total Deducidos       : -${total_ded:,.0f} COP")
+
+    ap = calcular_aportes_patronales(bruto)
+    print("\n--- APORTES PATRONALES (COSTO INSTITUCIONAL UPC) ---")
+    print(f"Pensión patronal (12%): ${ap['pension']:,} COP")
+    print(f"Salud patronal (8.5%) : ${ap['salud']:,} COP")
+    print(f"ARL (0.522%)          : ${ap['arl']:,} COP")
+    print(f"Caja compensación (4%): ${ap['caja']:,} COP")
+    print(f"Costo Total Empleador : ${calcular_costo_total_empleador(profesor):,.0f} COP")
+
+    print("\n=================================================================")
+    print(f">>> NETO A PAGAR DOCENTE: ${neto:,.0f} COP <<<")
+    print("=================================================================")
     print(observacion_normativa(profesor))
-    print("===========================================")
+    print("=================================================================")
 
 

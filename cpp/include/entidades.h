@@ -33,6 +33,7 @@ struct Profesor {
     int puntosTitulos;
     int puntosProductividad;
     bool activo;
+    std::string posgrado;          // Ninguno, Especializacion, Maestria, Doctorado
 };
 
 // ---------- Administrativo ----------

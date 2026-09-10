@@ -26,8 +26,9 @@ from gestion import (
     buscar_estudiante, buscar_profesor, buscar_administrativo,
 )
 from nomina import (
-    calcular_salario_bruto, calcular_descuento_salud, calcular_descuento_pension,
-    calcular_descuento_fsp,
+    calcular_salario_bruto, calcular_bonificacion_posgrado, calcular_total_devengado,
+    calcular_descuento_salud, calcular_descuento_pension, calcular_descuento_fsp,
+    calcular_descuento_estampilla, calcular_retencion_fuente, calcular_total_deducciones,
     calcular_salario_neto, calcular_prima_servicios, calcular_cesantias,
     calcular_intereses_cesantias, calcular_prima_navidad,
     calcular_vacaciones, calcular_prima_vacaciones, calcular_bonificacion_servicios,
@@ -1135,6 +1136,8 @@ class PitaApp(tk.Tk):
              "opciones": ["", "Auxiliar", "Asistente", "Asociado", "Titular"]},
             {"label": "Horas cátedra semanales (máx. 18)", "key": "horas_catedra", "tipo": "entry", "valor": "0"},
             {"label": "Ad-honorem (sin remuneración)", "key": "ad_honorem", "tipo": "check", "valor": False},
+            {"label": "Posgrado (Acuerdo 027/2024)", "key": "posgrado", "tipo": "combo",
+             "opciones": ["", "Especializacion", "Maestria", "Doctorado"]},
             {"label": "Años de experiencia", "key": "anios_experiencia", "tipo": "entry", "valor": "0"},
             {"label": "Puntos por títulos", "key": "puntos_titulos", "tipo": "entry", "valor": "0"},
             {"label": "Puntos por productividad", "key": "puntos_productividad", "tipo": "entry", "valor": "0"},
@@ -1162,6 +1165,7 @@ class PitaApp(tk.Tk):
                 v["identificacion"].strip(), v["nombre"].strip(), v["codigo_programa"],
                 v["tipo_vinculacion"], v["dedicacion"], v["categoria_escalafon"],
                 horas_catedra, bool(v["ad_honorem"]), anios, pt, pp, activo=True,
+                posgrado=v.get("posgrado", ""),
             ))
             self._refrescar_profesores()
             self._set_status(f"Profesor {v['identificacion']} creado.")
@@ -1186,6 +1190,9 @@ class PitaApp(tk.Tk):
              "valor": str(p.horas_catedra_semanales)},
             {"label": "Ad-honorem (sin remuneración)", "key": "ad_honorem", "tipo": "check",
              "valor": p.ad_honorem},
+            {"label": "Posgrado (Acuerdo 027/2024)", "key": "posgrado", "tipo": "combo",
+             "opciones": ["", "Especializacion", "Maestria", "Doctorado"],
+             "valor": getattr(p, "posgrado", "")},
             {"label": "Años de experiencia", "key": "anios_experiencia", "tipo": "entry",
              "valor": str(p.anios_experiencia)},
             {"label": "Puntos por títulos", "key": "puntos_titulos", "tipo": "entry",
@@ -1213,6 +1220,7 @@ class PitaApp(tk.Tk):
             p.dedicacion = v["dedicacion"]
             p.categoria_escalafon = v["categoria_escalafon"]
             p.ad_honorem = bool(v["ad_honorem"])
+            p.posgrado = v.get("posgrado", "")
             self._refrescar_profesores()
             self._set_status(f"Profesor {p.identificacion} modificado.")
             return None
@@ -1650,11 +1658,16 @@ class VentanaNomina(tk.Toplevel):
             return
 
         # ── Cálculos ───────────────────────────────────────────────────────
-        salud_e   = calcular_descuento_salud(bruto)
-        pension_e = calcular_descuento_pension(bruto)
-        fsp_e     = calcular_descuento_fsp(bruto)
-        total_ded = salud_e + pension_e + fsp_e
-        neto      = bruto - total_ded
+        bonif_posg = calcular_bonificacion_posgrado(profesor)
+        devengado  = calcular_total_devengado(profesor)
+
+        salud_e    = calcular_descuento_salud(bruto)
+        pension_e  = calcular_descuento_pension(bruto)
+        fsp_e      = calcular_descuento_fsp(bruto)
+        estampilla = calcular_descuento_estampilla(bruto)
+        retencion  = calcular_retencion_fuente(devengado, salud_e, pension_e)
+        total_ded  = salud_e + pension_e + fsp_e + estampilla + retencion
+        neto       = devengado - total_ded
 
         ap = calcular_aportes_patronales(bruto)
         costo_upc = bruto + ap["total"]
@@ -1687,16 +1700,24 @@ class VentanaNomina(tk.Toplevel):
 
         # 1. DEVENGADOS Y ASIGNACIONES (+)
         card_dev, self.lbl_sub_dev = crear_tarjeta(
-            "DEVENGADOS Y ASIGNACIONES (+)", f"$ {bruto:,.0f} COP", color_titulo="#1d4ed8")
+            "DEVENGADOS Y ASIGNACIONES (+)", f"$ {devengado:,.0f} COP", color_titulo="#1d4ed8")
         if profesor.tipo_vinculacion == "Planta":
             pts = total_puntos(profesor)
-            desc_asig = f"Asignación Básica Mensual ({pts} pts × ${VALOR_PUNTO:,.0f})"
+            desc_asig = f"Sueldo Básico ({pts} pts × ${VALOR_PUNTO:,.0f})"
         elif profesor.tipo_vinculacion == "Ocasional":
             fact = factor_ocasional(profesor) or 0.0
-            desc_asig = f"Asignación Básica Mensual ({fact:.3f} SMMLV × ${SMMLV:,.0f})"
+            desc_asig = f"Sueldo Básico ({fact:.3f} SMMLV × ${SMMLV:,.0f})"
         else:
-            desc_asig = "Asignación Básica Mensual"
+            desc_asig = "Sueldo Básico"
         self.lbl_asig_val = fila_card(card_dev, desc_asig, f"+ $ {bruto:,.0f} COP", bold=True, color="#1d4ed8")
+
+        self.lbl_bonif_posg = None
+        if bonif_posg > 0:
+            posg_nombre = getattr(profesor, "posgrado", "Postgrado")
+            self.lbl_bonif_posg = fila_card(
+                card_dev, f"Bonificación Cualificación {posg_nombre} (Acuerdo 027/2024)",
+                f"+ $ {bonif_posg:,.0f} COP", color="#1d4ed8"
+            )
         tk.Frame(card_dev, bg="white", height=6).pack()
 
         # 2. DEDUCCIONES OBLIGATORIAS DE LEY (-)
@@ -1704,8 +1725,12 @@ class VentanaNomina(tk.Toplevel):
             "DEDUCCIONES OBLIGATORIAS DE LEY (-)", f"$ {total_ded:,.0f} COP", color_titulo="#dc2626")
         self.lbl_ibc_ded = fila_card(card_ded, "IBC Seguridad Social (Base Cotización):", f"$ {bruto:,.0f} COP", bold=True)
         tk.Frame(card_ded, bg="white", height=4).pack()
-        self.lbl_salud_val = fila_card(card_ded, "Aporte Salud Trabajador (4%)", f"- $ {salud_e:,} COP", color="#dc2626")
-        self.lbl_pension_val = fila_card(card_ded, "Aporte Pensión Trabajador (4%)", f"- $ {pension_e:,} COP", color="#dc2626")
+        self.lbl_estampilla_val = fila_card(card_ded, "Descuento Estampilla Pro-UPC (0.2%)", f"- $ {estampilla:,} COP", color="#dc2626")
+        self.lbl_retencion_val = fila_card(card_ded, "Retención en la Fuente por Salario (Art. 383 E.T.)",
+                                          f"- $ {retencion:,} COP" if retencion > 0 else "$ 0 COP",
+                                          color="#dc2626" if retencion > 0 else "#6b7280")
+        self.lbl_pension_val = fila_card(card_ded, "Aporte Pensión Empleado (4% PILA)", f"- $ {pension_e:,} COP", color="#dc2626")
+        self.lbl_salud_val = fila_card(card_ded, "Aporte Salud Empleado (4% PILA)", f"- $ {salud_e:,} COP", color="#dc2626")
         self.lbl_fsp_val = fila_card(card_ded, "Fondo de Solidaridad Pensional (1%)", f"- $ {fsp_e:,} COP" if fsp_e > 0 else "$ 0 COP", color="#dc2626" if fsp_e > 0 else "#6b7280")
         tk.Frame(card_ded, bg="white", height=6).pack()
 
@@ -1733,6 +1758,8 @@ class VentanaNomina(tk.Toplevel):
         elif profesor.tipo_vinculacion == "Ocasional":
             fila_card(card_info, "Categoría Docente:", (profesor.categoria_escalafon or "—").upper(), bold=True)
             fila_card(card_info, "Dedicación:", profesor.dedicacion, bold=True)
+            if getattr(profesor, "posgrado", ""):
+                fila_card(card_info, "Cualificación Posgrado:", profesor.posgrado, bold=True)
             fact = factor_ocasional(profesor) or 0.0
             fila_card(card_info, "Factor Acuerdo UPC 027:", f"{fact:.3f} SMMLV", bold=True)
             fila_card(card_info, "SMMLV 2026 Vigente:", f"$ {SMMLV:,.0f} COP", bold=True)
@@ -1774,14 +1801,16 @@ class VentanaNomina(tk.Toplevel):
 
         self.lbl_neto_resumen = tk.Label(
             neto_box,
-            text=f"Total Devengado: $ {bruto:,.0f} COP  ·  Total Deducciones: -$ {total_ded:,.0f} COP",
+            text=f"Total Devengado: $ {devengado:,.0f} COP  ·  Total Deducciones: -$ {total_ded:,.0f} COP",
             font=("Segoe UI", 9), bg="white", fg="#6b7280"
         )
         self.lbl_neto_resumen.pack(anchor="w", padx=16, pady=(0, 12))
 
         # Guardar valores para switch Anual / Mensual
         self._val = {
-            "bruto": bruto, "total_ded": total_ded, "salud_e": salud_e, "pension_e": pension_e, "fsp_e": fsp_e,
+            "bruto": bruto, "bonif_posg": bonif_posg, "devengado": devengado,
+            "total_ded": total_ded, "estampilla": estampilla, "retencion": retencion,
+            "salud_e": salud_e, "pension_e": pension_e, "fsp_e": fsp_e,
             "costo_upc": costo_upc, "ap_salud": ap["salud"], "ap_pension": ap["pension"],
             "ap_arl": ap["arl"], "ap_caja": ap["caja"], "neto": neto,
             "total_ps": calcular_total_prestaciones(bruto),
@@ -1808,17 +1837,21 @@ class VentanaNomina(tk.Toplevel):
             self.periodo = "mensual"
             f = 1
             self.btn_periodo.configure(text="Ver anual")
-            self.lbl_periodo_fechas.configure(text="🗓 Período Liquidado: Marzo 2026  ·  01/03/2026 - 31/03/2026")
+            self.lbl_periodo_fechas.configure(text="🗓 Período Liquidado: Agosto 2026  ·  01/08/2026 - 31/08/2026")
 
         # Devengados
-        self.lbl_sub_dev.configure(text=f"$ {v['bruto']*f:,.0f} COP")
+        self.lbl_sub_dev.configure(text=f"$ {v['devengado']*f:,.0f} COP")
         self.lbl_asig_val.configure(text=f"+ $ {v['bruto']*f:,.0f} COP")
+        if self.lbl_bonif_posg and v["bonif_posg"] > 0:
+            self.lbl_bonif_posg.configure(text=f"+ $ {v['bonif_posg']*f:,.0f} COP")
 
         # Deducciones
         self.lbl_sub_ded.configure(text=f"$ {v['total_ded']*f:,.0f} COP")
         self.lbl_ibc_ded.configure(text=f"$ {v['bruto']*f:,.0f} COP")
-        self.lbl_salud_val.configure(text=f"- $ {v['salud_e']*f:,} COP")
+        self.lbl_estampilla_val.configure(text=f"- $ {v['estampilla']*f:,} COP")
+        self.lbl_retencion_val.configure(text=f"- $ {v['retencion']*f:,} COP" if v['retencion'] > 0 else "$ 0 COP")
         self.lbl_pension_val.configure(text=f"- $ {v['pension_e']*f:,} COP")
+        self.lbl_salud_val.configure(text=f"- $ {v['salud_e']*f:,} COP")
         self.lbl_fsp_val.configure(text=f"- $ {v['fsp_e']*f:,} COP" if v['fsp_e'] > 0 else "$ 0 COP")
 
         # Costo Empleador
@@ -1846,7 +1879,7 @@ class VentanaNomina(tk.Toplevel):
 
         # Neto
         self.lbl_neto_val.configure(text=f"$ {v['neto']*f:,.0f} COP")
-        self.lbl_neto_resumen.configure(text=f"Total Devengado: $ {v['bruto']*f:,.0f} COP  ·  Total Deducciones: -$ {v['total_ded']*f:,.0f} COP")
+        self.lbl_neto_resumen.configure(text=f"Total Devengado: $ {v['devengado']*f:,.0f} COP  ·  Total Deducciones: -$ {v['total_ded']*f:,.0f} COP")
 
 
 class VentanaSalarioAdmin(tk.Toplevel):

@@ -230,7 +230,8 @@ void guardarProfesores(const vector<Profesor>& v, const string& ruta) {
                 << p.dedicacion << "|" << p.categoriaEscalafon << "|"
                 << p.horasCatedraSemanales << "|" << (p.adHonorem ? 1 : 0) << "|"
                 << p.aniosExperiencia << "|" << p.puntosTitulos << "|"
-                << p.puntosProductividad << "|" << (p.activo ? 1 : 0) << "\n";
+                << p.puntosProductividad << "|" << (p.activo ? 1 : 0) << "|"
+                << p.posgrado << "\n";
     }
     archivo.close();
 }
@@ -258,6 +259,7 @@ vector<Profesor> cargarProfesores(const string& ruta) {
         p.puntosTitulos = stoi(campos[9]);
         p.puntosProductividad = stoi(campos[10]);
         p.activo = (campos[11] == "1");
+        p.posgrado = (campos.size() >= 13) ? campos[12] : "";
         resultado.push_back(p);
     }
     archivo.close();

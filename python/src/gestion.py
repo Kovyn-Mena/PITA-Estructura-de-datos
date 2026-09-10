@@ -449,10 +449,18 @@ def crear_profesor(profesores, programas):
     puntos_titulos = leer_entero("Puntos por titulos: ")
     puntos_productividad = leer_entero("Puntos por productividad: ")
 
+    posgrado = ""
+    if tipo_vinculacion in ("Ocasional", "Catedratico") and not ad_honorem:
+        print("\nCualificacion de postgrado (Acuerdo UPC 027/2024):")
+        print("1. Ninguno\n2. Especializacion\n3. Maestria\n4. Doctorado")
+        op_posg = leer_entero("Opcion (1 por defecto): ")
+        posgrados = {1: "", 2: "Especializacion", 3: "Maestria", 4: "Doctorado"}
+        posgrado = posgrados.get(op_posg, "")
+
     profesores.append(Profesor(
         identificacion, nombre, codigo_programa, tipo_vinculacion, dedicacion,
         categoria_escalafon, horas_catedra, ad_honorem, anios_experiencia,
-        puntos_titulos, puntos_productividad, activo=True
+        puntos_titulos, puntos_productividad, activo=True, posgrado=posgrado
     ))
     print("Profesor creado correctamente.")
 
@@ -464,8 +472,9 @@ def listar_profesores(profesores):
         return
     for p in profesores:
         estado = "Activo" if p.activo else "Inactivo"
+        posg = f" | Posg: {p.posgrado}" if getattr(p, "posgrado", "") else ""
         print(f"{p.identificacion} | {p.nombre_completo} | {p.tipo_vinculacion} | "
-              f"{p.dedicacion} | {p.categoria_escalafon} | Programa: {p.codigo_programa} | {estado}")
+              f"{p.dedicacion} | {p.categoria_escalafon}{posg} | Programa: {p.codigo_programa} | {estado}")
 
 
 def buscar_profesor(profesores, identificacion):
@@ -489,6 +498,14 @@ def modificar_profesor(profesores, identificacion):
             p.anios_experiencia = int(nuevos_anios)
         except ValueError:
             print("Valor invalido, se mantiene el anterior.")
+    if p.tipo_vinculacion in ("Ocasional", "Catedratico"):
+        actual_posg = getattr(p, "posgrado", "") or "Ninguno"
+        print(f"Cualificacion actual: {actual_posg}")
+        print("1. Ninguno\n2. Especializacion\n3. Maestria\n4. Doctorado\n0. Mantener")
+        op_posg = leer_entero("Nueva opcion: ")
+        posgrados = {1: "", 2: "Especializacion", 3: "Maestria", 4: "Doctorado"}
+        if op_posg in posgrados:
+            p.posgrado = posgrados[op_posg]
     print("Profesor modificado.")
 
 

@@ -19,13 +19,19 @@ Aplica a empleados públicos docentes de carrera.
 
 ## 2. Docentes Ocasionales (Acuerdo UPC 027 de 2024, Art. 24)
 
-No se rigen por el Decreto 1279. Su asignación se calcula en SMMLV:
+No se rigen por el Decreto 1279. Su asignación básica y bonificaciones se calculan en SMMLV:
 - **SMMLV Vigente 2026:** **$1.750.905 COP** (*Decreto 159 de 2026*).
-- **Factores de ponderación:**
+- **Factores de asignación básica (Sueldo):**
   - Auxiliar TC: $2.645$ SMMLV | MT: $1.509$ SMMLV
   - Asistente TC: $3.125$ SMMLV | MT: $1.749$ SMMLV
   - Asociado TC: $3.606$ SMMLV | MT: $1.990$ SMMLV
   - Titular TC: $3.918$ SMMLV | MT: $2.146$ SMMLV
+- **Bonificación mensual por cualificación en postgrado (Acuerdo UPC 027/2024):**
+  - Especialización: $0.10$ SMMLV ($175.091 COP)
+  - Maestría: $0.45$ SMMLV ($787.907 COP)
+  - Doctorado: $0.90$ SMMLV ($1.575.815 COP)
+  - *Nota legal:* Esta bonificación es un reconocimiento económico adicional y no constituye factor salarial para liquidación de prestaciones ni aportes a seguridad social.
+- **Total Devengados:** $\text{Sueldo Básico} + \text{Bonificación Postgrado}$.
 
 ---
 
@@ -34,16 +40,20 @@ No se rigen por el Decreto 1279. Su asignación se calcula en SMMLV:
 - La liquidación depende de las horas mensuales asignadas y el valor hora fijado por resolución rectoral.
 - Si no está configurada la resolución vigente, el sistema indica explícitamente **"Liquidación no disponible / pendiente de resolución rectoral"** sin inventar valores ficticios.
 - Soporta modalidad **Ad-honorem** (sin remuneración).
+- La bonificación por postgrado se reconoce de forma proporcional a las horas cátedra.
 
 ---
 
 ## 4. Deducciones Obligatorias del Trabajador
 
-Conforme al **Decreto 1990 de 2016** y la plataforma PILA, todos los aportes se redondean a **pesos enteros sin centavos**:
-1. **Salud empleado (4%):** $\text{round}(\text{Salario Bruto} \times 0.04)$ (*Ley 100 de 1993, art. 204*).
-2. **Pensión empleado (4%):** $\text{round}(\text{Salario Bruto} \times 0.04)$ (*Ley 100 de 1993, art. 20*).
-3. **Fondo de Solidaridad Pensional - FSP (1%):** $\text{round}(\text{Salario Bruto} \times 0.01)$ si $\text{Salario Bruto} \ge 4 \text{ SMMLV}$ (*Leyes 100 de 1993 y 797 de 2003*).
-- **Salario Neto:** $\text{Salario Bruto} - \text{Salud} - \text{Pensión} - \text{FSP}$.
+Conforme al **Decreto 1990 de 2016** (plataforma PILA) y la normativa tributaria:
+1. **Salud empleado (4%):** Se calcula sobre el salario básico (IBC) y se aproxima al **múltiplo de 100 más cercano** según regla PILA.
+2. **Pensión empleado (4%):** Se calcula sobre el salario básico (IBC) y se aproxima al **múltiplo de 100 más cercano**.
+3. **Fondo de Solidaridad Pensional - FSP (1%):** Aplica si el salario básico $\ge 4\text{ SMMLV}$ ($7.003.620 COP).
+4. **Descuento Estampilla Pro-UPC (0.2%):** Gravamen territorial del $0.2\%$ sobre el sueldo básico contractual.
+5. **Retención en la fuente por salarios (Art. 383 Estatuto Tributario):** Se aplica la tarifa del $19\%$ sobre la base gravable depurada (restando salud y pensión obligatoria y el $25\%$ de renta exenta laboral) que exceda el umbral de 95 UVT, redondeado a miles (norma DIAN).
+- **Neto a Pagar:** $\text{Total Devengados} - \text{Total Deducciones}$.
+  *(Ejemplo real docente Adith Pérez: Devengado \$7.889.578 - Deducciones \$624.828 = **\$7.264.750 COP**)*.
 
 ---
 

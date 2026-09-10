@@ -523,6 +523,18 @@ void crearProfesor(vector<Profesor>& profesores, vector<Programa>& programas) {
     p.puntosTitulos = leerEntero();
     cout << "Puntos por productividad academica: ";
     p.puntosProductividad = leerEntero();
+
+    p.posgrado = "";
+    if ((p.tipoVinculacion == "Ocasional" || p.tipoVinculacion == "Catedratico") && !p.adHonorem) {
+        cout << "\nCualificacion de postgrado (Acuerdo UPC 027/2024):\n";
+        cout << "1. Ninguno\n2. Especializacion\n3. Maestria\n4. Doctorado\n";
+        cout << "Opcion (1 por defecto): ";
+        int op = leerEntero();
+        if (op == 2) p.posgrado = "Especializacion";
+        else if (op == 3) p.posgrado = "Maestria";
+        else if (op == 4) p.posgrado = "Doctorado";
+    }
+
     p.activo = true;
 
     profesores.push_back(p);
@@ -540,6 +552,7 @@ void listarProfesores(const vector<Profesor>& profesores) {
              << " | Programa: " << p.codigoPrograma
              << " | " << p.tipoVinculacion << " (" << p.dedicacion << ")";
         if (!p.categoriaEscalafon.empty()) cout << " | Categoria: " << p.categoriaEscalafon;
+        if (!p.posgrado.empty()) cout << " | Posg: " << p.posgrado;
         if (p.adHonorem) cout << " | AD-HONOREM";
         cout << " | " << (p.activo ? "Activo" : "Inactivo") << "\n";
     }
@@ -564,6 +577,18 @@ void modificarProfesor(vector<Profesor>& profesores, const string& id) {
     p->puntosTitulos = leerEntero();
     cout << "Nuevos puntos por productividad (" << p->puntosProductividad << "): ";
     p->puntosProductividad = leerEntero();
+
+    if (p->tipoVinculacion == "Ocasional" || p->tipoVinculacion == "Catedratico") {
+        cout << "Cualificacion actual: " << (p->posgrado.empty() ? "Ninguno" : p->posgrado) << "\n";
+        cout << "1. Ninguno\n2. Especializacion\n3. Maestria\n4. Doctorado\n0. Mantener\n";
+        cout << "Nueva opcion: ";
+        int op = leerEntero();
+        if (op == 1) p->posgrado = "";
+        else if (op == 2) p->posgrado = "Especializacion";
+        else if (op == 3) p->posgrado = "Maestria";
+        else if (op == 4) p->posgrado = "Doctorado";
+    }
+
     cout << "Profesor modificado.\n";
 }
 

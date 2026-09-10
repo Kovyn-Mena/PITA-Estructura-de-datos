@@ -1,30 +1,6 @@
-A001|Manuel Rincon|Secretario Academico|Nivel 2|Planta|2800000.0||1
-A002|Natalia Torres|Auxiliar Financiero|Nivel 1|Provisional|1925000.0|FING|1
-A003|Ricardo Castro|Coordinador Administrativo|Nivel 3|Planta|3750000.0|FCS|1
-A004|Valentina Gonzalez|Auxiliar de Biblioteca|Nivel 1|Contrato|1975000.0|FDCP|1
-A005|Andres Mendoza|Profesional Universitario|Nivel 2|Planta|3200000.0|FBA|1
-A006|Cesar Quintero|Tecnico Administrativo|Nivel 1|Contrato|2225000.0||1
-A007|Fernanda Sanchez|Jefe de Oficina|Nivel 4|Planta|5050000.0|FCB|1
-A008|Jimena Barrios|Asistente de Decanatura|Nivel 1|Contrato|2275000.0|FACE|1
-A009|Liliana Florez|Secretario Academico|Nivel 2|Planta|2800000.0|FING|0
-A010|Mateo Marin|Auxiliar Financiero|Nivel 1|Provisional|1925000.0|FCS|1
-A011|Pedro Pardo|Coordinador Administrativo|Nivel 3|Planta|3750000.0||1
-A012|Sofia Romero|Auxiliar de Biblioteca|Nivel 1|Contrato|1975000.0|FBA|1
-A013|Alejandro Acosta|Profesional Universitario|Nivel 2|Planta|3200000.0|FED|1
-A014|Carlos Duarte|Tecnico Administrativo|Nivel 1|Contrato|2225000.0|FCB|1
-A015|Elena Jimenez|Jefe de Oficina|Nivel 4|Planta|5050000.0|FACE|1
-A016|Isabela Orozco|Asistente de Decanatura|Nivel 1|Contrato|2275000.0||1
-A017|Laura Rivera|Secretario Academico|Nivel 2|Planta|2800000.0|FCS|1
-A018|Mariana Vargas|Auxiliar Financiero|Nivel 1|Provisional|1925000.0|FDCP|1
-A019|Paola Contreras|Coordinador Administrativo|Nivel 3|Planta|3750000.0|FBA|1
-A020|Sebastian Gutierrez|Auxiliar de Biblioteca|Nivel 1|Contrato|1975000.0|FED|1
-A021|Wilson Morales|Profesional Universitario|Nivel 2|Planta|3200000.0||1
-A022|Beatriz Reyes|Tecnico Administrativo|Nivel 1|Contrato|2225000.0|FACE|0
-A023|Diana Suarez|Jefe de Oficina|Nivel 4|Planta|5050000.0|FING|1
-A024|Gustavo Bolivar|Asistente de Decanatura|Nivel 1|Contrato|2275000.0|FCS|1
-A025|Juan Gomez|Secretario Academico|Nivel 2|Planta|2800000.0|FDCP|1
-A026|Marcela Medina|Auxiliar Financiero|Nivel 1|Provisional|1925000.0||1
-A027|Nicolas Pineda|Coordinador Administrativo|Nivel 3|Planta|3750000.0|FED|1
-A028|Roberto Salazar|Auxiliar de Biblioteca|Nivel 1|Contrato|1975000.0|FCB|1
-A029|Victor Alarcon|Profesional Universitario|Nivel 2|Planta|3200000.0|FACE|1
-A030|Angela Fernandez|Tecnico Administrativo|Nivel 1|Contrato|2225000.0|FING|1
+A001|Manuel Rincon|Auxiliar de Biblioteca|Nivel 1|Contrato|1950000.0||1
+A002|Natalia Torres|Secretario Academico|Nivel 2|Planta|2800000.0|FING|1
+A003|Ricardo Castro|Coordinador Academico|Nivel 3|Planta|3750000.0|FING|1
+A004|Fernanda Sanchez|Jefe de Oficina Planeacion|Nivel 4|Planta|5050000.0||1
+A005|Pedro Pardo|Tecnico de Sistemas|Nivel 2|Provisional|2900000.0|FING|1
+A006|Liliana Florez|Auxiliar de Registro|Nivel 1|Contrato|1950000.0|FING|0
