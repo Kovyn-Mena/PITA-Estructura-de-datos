@@ -374,10 +374,7 @@ void matricularCurso(vector<Estudiante>& estudiantes, const string& id, vector<C
     Matricula m;
     m.codigoCurso = codigoCurso;
     cout << "Nota (0.0 si aun no tiene, se puede modificar despues): ";
-    m.nota = static_cast<float>(leerEntero()); // nota simple, se puede volver float editable en modificar
-    // Nota: si se quiere permitir decimales aqui mismo, se puede leer con
-    // cin >> m.nota directamente (float), siguiendo el mismo cuidado de
-    // limpiar el buffer despues. Se deja como mejora futura.
+    m.nota = leerFlotante();
 
     e->matriculas.push_back(m);
     cout << "Matricula registrada correctamente.\n";

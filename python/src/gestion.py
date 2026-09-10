@@ -1,7 +1,12 @@
-"""Funciones de gestion (CRUD) por entidad.
-FACULTADES, PROGRAMAS y CURSOS estan completos (mismo patron que la
-version C++). ESTUDIANTES, PROFESORES y ADMINISTRATIVOS quedan pendientes
-para el siguiente bloque de Python."""
+"""Módulo de Gestión Académica y Administrativa (Operaciones CRUD y Lógica de Negocio).
+Implementa para cada TAD las operaciones de:
+- Creación e Inclusión
+- Consulta y Búsqueda
+- Modificación
+- Desactivación (Borrado Lógico)
+- Eliminación (Borrado Físico)
+- Operaciones especializadas: Matrículas, Cálculo de Promedio, Alerta EBRA y Desgloses de Nómina.
+"""
 
 from entidades import Facultad, Programa, Curso, Estudiante, Profesor, Administrativo
 from interfaz import leer_palabra, es_cancelar, leer_entero, leer_si_no
@@ -634,3 +639,14 @@ def eliminar_administrativo(admins, identificacion):
         return
     admins.remove(a)
     print("Administrativo eliminado permanentemente.")
+
+
+def consultar_administrativo(admins, identificacion):
+    """Muestra el desprendible oficial de liquidación de nómina de un administrativo."""
+    a = buscar_administrativo(admins, identificacion)
+    if a is None:
+        print("Administrativo no encontrado.")
+        return
+    from nomina import imprimir_desglose_nomina_admin
+    imprimir_desglose_nomina_admin(a)
+

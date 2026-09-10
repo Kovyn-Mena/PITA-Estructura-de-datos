@@ -41,4 +41,7 @@ bool esCancelar(const std::string& texto);
 // del error y vuelve a pedirlo.
 int leerEntero();
 
+// Lee un numero flotante de forma segura (ej. notas de estudiantes).
+float leerFlotante();
+
 #endif

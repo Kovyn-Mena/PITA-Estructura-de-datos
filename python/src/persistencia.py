@@ -1,21 +1,26 @@
-"""Persistencia en texto plano delimitado por '|'.
-Mismo formato que la version C++ (ver docs/formato_persistencia.md),
-para que los archivos de datos sean intercambiables entre ambas versiones."""
+"""Módulo de Persistencia en Texto Plano delimitado por '|'.
+Garantiza que los archivos en data/ sean 100% intercambiables entre Python y C++.
+Formato documentado en docs/formato_persistencia.md.
+"""
 
 import os
 from entidades import Facultad, Programa, Curso, Estudiante, Profesor, Administrativo
 
 
+# ============================ FACULTADES ============================
+
 def guardar_facultades(facultades, ruta):
+    """Serializa la lista de facultades en disco con formato pipe-delimited."""
     with open(ruta, "w", encoding="utf-8") as archivo:
         for f in facultades:
             archivo.write(f"{f.codigo}|{f.nombre}|{f.decano}|{1 if f.activo else 0}\n")
 
 
 def cargar_facultades(ruta):
+    """Deserializa las facultades desde archivo. Si no existe, retorna lista vacía."""
     resultado = []
     if not os.path.exists(ruta):
-        return resultado  # no es un error, simplemente no hay datos aun
+        return resultado
     with open(ruta, "r", encoding="utf-8") as archivo:
         for linea in archivo:
             linea = linea.strip()
@@ -23,7 +28,7 @@ def cargar_facultades(ruta):
                 continue
             campos = linea.split("|")
             if len(campos) < 4:
-                continue  # linea corrupta, se ignora
+                continue  # Línea corrupta o incompleta, se omite
             codigo, nombre, decano, activo = campos[0], campos[1], campos[2], campos[3]
             resultado.append(Facultad(codigo, nombre, decano, activo == "1"))
     return resultado

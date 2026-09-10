@@ -31,7 +31,7 @@ from gestion import (
     crear_profesor, listar_profesores, modificar_profesor,
     desactivar_profesor, eliminar_profesor, consultar_profesor,
     crear_administrativo, listar_administrativos, modificar_administrativo,
-    desactivar_administrativo, eliminar_administrativo,
+    desactivar_administrativo, eliminar_administrativo, consultar_administrativo,
 )
 from persistencia import (
     guardar_facultades, cargar_facultades,
@@ -267,6 +267,7 @@ def menu_administrativos(admins, facultades):
         limpiar_pantalla()
         print("\n--- Menu Administrativos ---")
         print("1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar")
+        print("6. Ver liquidacion de nomina")
         print("0. Volver (o presione ENTER)")
         opcion = leer_opcion_inmediata("Opcion: ")
 
@@ -290,6 +291,10 @@ def menu_administrativos(admins, facultades):
                 eliminar_administrativo(admins, identificacion)
             else:
                 print("Operacion cancelada.")
+            pausar()
+        elif opcion == 6:
+            identificacion = input("Identificacion del administrativo: ").strip()
+            consultar_administrativo(admins, identificacion)
             pausar()
         elif opcion == 0:
             break

@@ -113,7 +113,22 @@ int leerEntero() {
         if (cin.fail()) {
             cin.clear();
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            cout << "Entrada invalida. Ingrese un numero: ";
+            cout << "Entrada invalida. Ingrese un numero entero: ";
+            continue;
+        }
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        return valor;
+    }
+}
+
+float leerFlotante() {
+    float valor;
+    while (true) {
+        cin >> valor;
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "Entrada invalida. Ingrese una nota valida (ej. 3.5): ";
             continue;
         }
         cin.ignore(numeric_limits<streamsize>::max(), '\n');

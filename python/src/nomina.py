@@ -511,3 +511,47 @@ def imprimir_desglose_nomina(profesor):
     print("=================================================================")
 
 
+def imprimir_desglose_nomina_admin(admin):
+    """Genera e imprime en consola el desprendible oficial de nómina del personal administrativo."""
+    bruto = calcular_salario_bruto_admin(admin)
+    salud = calcular_descuento_salud_admin(bruto)
+    pension = calcular_descuento_pension_admin(bruto)
+    fsp = calcular_descuento_fsp_admin(bruto)
+    total_ded = salud + pension + fsp
+    neto = bruto - total_ded
+    ap = calcular_aportes_patronales_admin(bruto)
+    costo_upc = bruto + ap["total"]
+
+    print(f"\n=================================================================")
+    print(f"    DESPRENDIBLE OFICIAL DE PAGO PERSONAL ADMINISTRATIVO (UPC)   ")
+    print(f"=================================================================")
+    print(f"Funcionario           : {admin.nombre_completo} (ID: {admin.identificacion})")
+    print(f"Cargo / Nivel         : {admin.cargo} ({admin.categoria})")
+    print(f"Tipo de Contratación  : {admin.tipo_contratacion}")
+    fac = admin.codigo_facultad if admin.codigo_facultad else "Nivel Central"
+    print(f"Adscrito a            : {fac}")
+
+    print(f"\n--- DEVENGADOS Y ASIGNACIONES (+) ---")
+    print(f"Asignación Salarial   : ${bruto:,.0f} COP ({admin.categoria} - Decretos Salariales 2026)")
+
+    print(f"\n--- DEDUCCIONES OBLIGATORIAS DE LEY (-) [Total: -${total_ded:,.0f} COP] ---")
+    print(f"IBC Seguridad Social  : ${bruto:,.0f} COP")
+    print(f"(-) Salud (4%)        : -${salud:,.0f} COP")
+    print(f"(-) Pensión (4%)      : -${pension:,.0f} COP")
+    if fsp > 0:
+        print(f"(-) FSP (1%)          : -${fsp:,.0f} COP (salario >= 4 SMMLV)")
+    else:
+        print(f"    FSP (1%)          : $0 COP (no supera 4 SMMLV)")
+
+    print(f"\n--- COSTO TOTAL EMPLEADOR (UPC) [Total: ${costo_upc:,.0f} COP] ---")
+    print(f"Asignación Básica     : ${bruto:,.0f} COP")
+    print(f"Salud Patronal (8.5%) : ${ap['salud']:,} COP")
+    print(f"Pensión Patronal (12%): ${ap['pension']:,} COP")
+    print(f"ARL (0.522%)          : ${ap['arl']:,} COP")
+    print(f"Caja Compensación (4%): ${ap['caja']:,} COP")
+
+    print(f"\n=================================================================")
+    print(f">>> NETO A PAGAR FUNCIONARIO: ${neto:,.0f} COP <<<")
+    print(f"=================================================================")
+
+

@@ -14,7 +14,6 @@ const string RUTA_ESTUDIANTES = "data/estudiantes.txt";
 const string RUTA_MATRICULAS = "data/matriculas.txt";
 const string RUTA_PROFESORES = "data/profesores.txt";
 const string RUTA_ADMINISTRATIVOS = "data/administrativos.txt";
-// TODO: agregar rutas de los demas archivos de datos a medida que se implementen.
 
 // NOTA DE DISEÑO (pantalla): cada menu limpia la pantalla ANTES de
 // dibujarse, y hace pausar() DESPUES de cada accion (excepto "Volver").
