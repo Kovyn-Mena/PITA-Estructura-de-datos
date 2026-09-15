@@ -1,4 +1,5 @@
 #include "../include/generador.h"
+#include "../include/gestion.h"
 #include "../include/persistencia.h"
 #include "../include/interfaz.h"
 #include <iostream>
@@ -6,6 +7,8 @@
 #include <random>
 #include <iomanip>
 #include <sstream>
+#include <unordered_map>
+#include <algorithm>
 
 using namespace std;
 
@@ -250,6 +253,41 @@ string formatearCodigo(const string& prefijo, int numero, int ancho) {
     return oss.str();
 }
 
+const vector<string> DIAS_SEMANA = {
+    "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"
+};
+
+struct FranjaHoraria {
+    int inicio;
+    int fin;
+};
+
+const vector<FranjaHoraria> FRANJAS_HORARIAS = {
+    {6, 8},
+    {8, 10},
+    {10, 12},
+    {14, 16},
+    {16, 18},
+    {18, 20},
+    {20, 22}
+};
+
+vector<string> inicializarSalones() {
+    vector<string> salones;
+    salones.reserve(400);
+    const string edificios = "ABCDEFGHIJ";
+    for (char ed : edificios) {
+        for (int piso = 1; piso <= 4; ++piso) {
+            for (int num = 1; num <= 10; ++num) {
+                ostringstream oss;
+                oss << ed << "-" << piso << setfill('0') << setw(2) << num;
+                salones.push_back(oss.str());
+            }
+        }
+    }
+    return salones;
+}
+
 } // namespace
 
 void generarDatosMasivos(
@@ -372,10 +410,13 @@ void generarDatosMasivos(
 
     cout << "  [4/5] Generando 7.500 materias (50 por programa con profesor asignado)...\n";
     int codCursoNum = 1;
+    vector<vector<string>> cursosPorPrograma(programas.size());
+
     for (size_t pIdx = 0; pIdx < programas.size(); ++pIdx) {
         const string& codProg = programas[pIdx].codigo;
         const string& nomProg = programas[pIdx].nombre;
         const auto& listaProfs = profesoresPorPrograma[pIdx];
+        cursosPorPrograma[pIdx].reserve(50);
 
         for (int c = 0; c < 50; ++c) {
             Curso cur;
@@ -389,14 +430,24 @@ void generarDatosMasivos(
             cur.codigoPrograma = codProg;
             cur.activo = (distPorcentaje(rng) <= 95);
 
+            cursosPorPrograma[pIdx].push_back(cur.codigo);
             cursos.push_back(cur);
         }
     }
 
-    cout << "  [5/5] Generando 225.000 estudiantes (1.500 por programa)...\n";
+    cout << "  [4.1] Generando horarios academicos libres de conflicto para 7.500 materias...\n";
+    generarHorariosCursos(cursos);
+
+    cout << "  [5/5] Generando 225.000 estudiantes (1.500 por programa) con matriculas y calificaciones...\n";
     long long codEstudianteNum = 1000000001LL;
+    uniform_real_distribution<float> distBaseErra(1.8f, 3.20f);
+    uniform_real_distribution<float> distBaseNormal(3.30f, 4.80f);
+    uniform_real_distribution<float> distVar(-0.35f, 0.35f);
+
     for (size_t pIdx = 0; pIdx < programas.size(); ++pIdx) {
         const string& codProg = programas[pIdx].codigo;
+        const auto& cursosProg = cursosPorPrograma[pIdx];
+
         for (int eIdx = 0; eIdx < 1500; ++eIdx) {
             Estudiante est;
             est.identificacion = to_string(codEstudianteNum++);
@@ -415,6 +466,27 @@ void generarDatosMasivos(
             } else {
                 est.estado = "Inactivo";
                 est.activo = false;
+            }
+
+            // Asignacion de matriculas y calificaciones (ERRA: promedio < 3.25)
+            // ~95% de estudiantes tienen 3-4 materias con notas
+            // ~5% sin materias (recien matriculados / inactivos sin registro)
+            if (estRand <= 95 && !cursosProg.empty()) {
+                int riesgoRand = distPorcentaje(rng);
+                float basePromedio = (riesgoRand <= 22) ? distBaseErra(rng) : distBaseNormal(rng);
+                int numCursos = 3 + (rng() % 2); // 3 o 4 materias
+
+                int startOffset = rng() % cursosProg.size();
+                est.matriculas.reserve(numCursos);
+                for (int k = 0; k < numCursos; ++k) {
+                    Matricula m;
+                    m.codigoCurso = cursosProg[(startOffset + k) % cursosProg.size()];
+                    float nota = basePromedio + distVar(rng);
+                    if (nota < 1.0f) nota = 1.0f;
+                    if (nota > 5.0f) nota = 5.0f;
+                    m.nota = std::round(nota * 10.0f) / 10.0f;
+                    est.matriculas.push_back(m);
+                }
             }
 
             estudiantes.push_back(move(est));
@@ -480,3 +552,292 @@ void menuGeneracionMasiva(
     cout << " - Estudiantes: " << estudiantes.size() << "\n";
     cout << "Archivos actualizados correctamente en carpeta data/.\n";
 }
+
+int generarHorariosCursos(vector<Curso>& cursos) {
+    static const auto SALONES = inicializarSalones();
+    const size_t numSalones = SALONES.size();
+    const size_t numFranjas = FRANJAS_HORARIAS.size();
+    const size_t numSlots = DIAS_SEMANA.size() * numFranjas; // 42 slots
+
+    unordered_map<string, uint64_t> ocupacionProfesor;
+    unordered_map<string, uint64_t> ocupacionSalon;
+    ocupacionProfesor.reserve(cursos.size() * 2);
+    ocupacionSalon.reserve(numSalones * 2);
+
+    mt19937 rng(987654);
+    uniform_int_distribution<size_t> distSlot(0, numSlots - 1);
+    uniform_int_distribution<size_t> distSalon(0, numSalones - 1);
+
+    int asignados = 0;
+
+    for (auto& c : cursos) {
+        const string& profId = c.codigoProfesor;
+        size_t startSlot = distSlot(rng);
+        size_t startSalon = distSalon(rng);
+        bool asignado = false;
+
+        for (size_t sStep = 0; sStep < numSlots; ++sStep) {
+            size_t slot = (startSlot + sStep) % numSlots;
+            uint64_t mask = (1ULL << slot);
+
+            if (!profId.empty() && (ocupacionProfesor[profId] & mask)) {
+                continue; // Conflicto: profesor ocupado en este slot
+            }
+
+            for (size_t rStep = 0; rStep < numSalones; ++rStep) {
+                size_t salIdx = (startSalon + rStep) % numSalones;
+                const string& sal = SALONES[salIdx];
+
+                if (!(ocupacionSalon[sal] & mask)) {
+                    // Libre para profesor y aula
+                    if (!profId.empty()) {
+                        ocupacionProfesor[profId] |= mask;
+                    }
+                    ocupacionSalon[sal] |= mask;
+
+                    size_t dIdx = slot / numFranjas;
+                    size_t fIdx = slot % numFranjas;
+
+                    c.dia = DIAS_SEMANA[dIdx];
+                    c.horaInicio = FRANJAS_HORARIAS[fIdx].inicio;
+                    c.horaFin = FRANJAS_HORARIAS[fIdx].fin;
+                    c.salon = sal;
+
+                    asignado = true;
+                    asignados++;
+                    break;
+                }
+            }
+            if (asignado) break;
+        }
+    }
+    return asignados;
+}
+
+void menuGeneracionHorarios(vector<Curso>& cursos, const string& rutaCursos) {
+    cout << "\n===========================================================\n";
+    cout << "      GENERACION AUTOMATICA DE HORARIOS ACADEMICOS         \n";
+    cout << "===========================================================\n";
+    cout << "Total de materias a programar: " << cursos.size() << "\n";
+    cout << "Parametros de franjas y aulas:\n";
+    cout << " - Dias: Lunes a Sabado (6 dias)\n";
+    cout << " - Franjas horarias: 06:00 a 22:00 (bloques de 2 horas)\n";
+    cout << " - Salones disponibles: 400 aulas (Edificios A al J)\n";
+    cout << " - Control de conflictos: 0 colisiones en profesor o aula\n";
+
+    char resp = leerSiNo("\nDesea generar y guardar los horarios de las materias? (s/n): ");
+    if (resp != 's') {
+        cout << "Operacion cancelada. No se modificaron los horarios.\n";
+        return;
+    }
+
+    cout << "\nGenerando horarios academicos libres de conflicto...\n";
+    auto t0 = chrono::high_resolution_clock::now();
+    int asignados = generarHorariosCursos(cursos);
+    guardarCursos(cursos, rutaCursos);
+    auto t1 = chrono::high_resolution_clock::now();
+    chrono::duration<double> dur = t1 - t0;
+
+    cout << "\n===========================================================\n";
+    cout << "      HORARIOS GENERADOS Y GUARDADOS CON EXITO             \n";
+    cout << "===========================================================\n";
+    cout << "Materias procesadas:           " << cursos.size() << "\n";
+    cout << "Materias con horario asignado: " << asignados << "\n";
+    cout << "Conflictos profesor / franja : 0\n";
+    cout << "Conflictos salon / franja    : 0\n";
+    cout << "Tiempo de ejecucion:           " << fixed << setprecision(3) << dur.count() << " segundos.\n";
+    cout << "Archivo de datos actualizado:  " << rutaCursos << "\n";
+
+    // Muestra automatica de 4 ejemplos de cursos con horario
+    cout << "\n--- EJEMPLOS DE ASIGNATURAS CON HORARIO ASIGNADO ---\n";
+    cout << left << setw(10) << "Codigo"
+         << setw(33) << "Nombre Asignatura"
+         << setw(10) << "Programa"
+         << setw(12) << "Profesor"
+         << setw(12) << "Dia"
+         << setw(15) << "Horario"
+         << setw(10) << "Salon" << "\n";
+    cout << string(102, '-') << "\n";
+
+    size_t mostrados = 0;
+    for (const auto& c : cursos) {
+        if (c.horaInicio > 0) {
+            string franja = to_string(c.horaInicio) + ":00-" + to_string(c.horaFin) + ":00";
+            string nomStr = (c.nombre.size() > 31) ? c.nombre.substr(0, 29) + ".." : c.nombre;
+            cout << left << setw(10) << c.codigo
+                 << setw(33) << nomStr
+                 << setw(10) << c.codigoPrograma
+                 << setw(12) << c.codigoProfesor
+                 << setw(12) << c.dia
+                 << setw(15) << franja
+                 << setw(10) << c.salon << "\n";
+            if (++mostrados >= 4) break;
+        }
+    }
+}
+
+void consultarHorarioCurso(const vector<Curso>& cursos) {
+    if (cursos.empty()) {
+        cout << "\nNo hay cursos registrados.\n";
+        return;
+    }
+    cout << "\n--- CONSULTA DE HORARIOS DE ASIGNATURAS ---\n";
+    string codigo = leerPalabra("Ingrese codigo del curso (ej: CUR00001) o 'muestra' para ver 10: ");
+
+    if (codigo == "muestra" || codigo.empty()) {
+        cout << "\n--- MUESTRA REPRESENTATIVA DE HORARIOS (10 Asignaturas) ---\n";
+        cout << left << setw(10) << "Codigo"
+             << setw(35) << "Nombre Asignatura"
+             << setw(12) << "Dia"
+             << setw(14) << "Franja"
+             << setw(10) << "Salon"
+             << setw(12) << "Profesor"
+             << setw(10) << "Programa" << "\n";
+        cout << string(103, '-') << "\n";
+
+        size_t muestra = min(size_t(10), cursos.size());
+        for (size_t i = 0; i < muestra; ++i) {
+            const auto& c = cursos[i];
+            string franja = (c.horaInicio > 0) ? (to_string(c.horaInicio) + ":00 - " + to_string(c.horaFin) + ":00") : "Sin horario";
+            string diaStr = c.dia.empty() ? "N/A" : c.dia;
+            string salStr = c.salon.empty() ? "N/A" : c.salon;
+
+            cout << left << setw(10) << c.codigo
+                 << setw(35) << (c.nombre.size() > 33 ? c.nombre.substr(0, 31) + ".." : c.nombre)
+                 << setw(12) << diaStr
+                 << setw(14) << franja
+                 << setw(10) << salStr
+                 << setw(12) << c.codigoProfesor
+                 << setw(10) << c.codigoPrograma << "\n";
+        }
+        return;
+    }
+
+    bool encontrado = false;
+    for (const auto& c : cursos) {
+        if (c.codigo == codigo) {
+            encontrado = true;
+            cout << "\n=======================================================\n";
+            cout << "FICHA DE HORARIO - " << c.codigo << "\n";
+            cout << "=======================================================\n";
+            cout << "Asignatura    : " << c.nombre << "\n";
+            cout << "Creditos      : " << c.creditos << "\n";
+            cout << "Programa      : " << c.codigoPrograma << "\n";
+            cout << "Profesor      : " << c.codigoProfesor << "\n";
+            cout << "Dia           : " << (c.dia.empty() ? "(Sin horario)" : c.dia) << "\n";
+            if (c.horaInicio > 0) {
+                cout << "Horario       : " << c.horaInicio << ":00 a " << c.horaFin << ":00\n";
+            } else {
+                cout << "Horario       : (Sin horario)\n";
+            }
+            cout << "Aula/Salon    : " << (c.salon.empty() ? "(Sin salon)" : c.salon) << "\n";
+            cout << "Estado        : " << (c.activo ? "Activo" : "Inactivo") << "\n";
+            cout << "=======================================================\n";
+            break;
+        }
+    }
+    if (!encontrado) {
+        cout << "Curso con codigo " << codigo << " no encontrado.\n";
+    }
+}
+
+void evaluarErraMasivo(const vector<Estudiante>& estudiantes) {
+    if (estudiantes.empty()) {
+        cout << "\nNo hay estudiantes registrados en el sistema para evaluar.\n";
+        return;
+    }
+
+    cout << "\n===========================================================\n";
+    cout << "     EVALUACION MASIVA DE RENDIMIENTO ACADEMICO (ERRA)     \n";
+    cout << "===========================================================\n";
+    cout << "Criterio institucional : Promedio acumulado < 3.25\n";
+    cout << "Regla de proteccion    : Estudiantes sin notas no generan alerta\n";
+    cout << "Total de estudiantes   : " << estudiantes.size() << "\n";
+    cout << "-----------------------------------------------------------\n";
+    cout << "Evaluando desempeno academico institucional...\n";
+
+    auto t0 = chrono::high_resolution_clock::now();
+
+    size_t total = estudiantes.size();
+    size_t conNotas = 0;
+    size_t sinNotas = 0;
+    size_t enErra = 0;
+    size_t sinRiesgo = 0;
+    double sumaPromedios = 0.0;
+
+    for (const auto& e : estudiantes) {
+        if (e.matriculas.empty()) {
+            sinNotas++;
+        } else {
+            conNotas++;
+            float prom = calcularPromedio(e);
+            sumaPromedios += prom;
+            if (estaEnRiesgoEbra(e)) {
+                enErra++;
+            } else {
+                sinRiesgo++;
+            }
+        }
+    }
+
+    auto t1 = chrono::high_resolution_clock::now();
+    chrono::duration<double> dur = t1 - t0;
+
+    double promGlobal = conNotas > 0 ? (sumaPromedios / conNotas) : 0.0;
+    double pctErraTotal = (enErra * 100.0) / total;
+    double pctErraConNotas = conNotas > 0 ? (enErra * 100.0) / conNotas : 0.0;
+    double pctSinRiesgo = conNotas > 0 ? (sinRiesgo * 100.0) / conNotas : 0.0;
+    double pctSinNotas = (sinNotas * 100.0) / total;
+
+    cout << "\n===========================================================\n";
+    cout << "          RESUMEN CONSOLIDADO DE ALERTA ERRA               \n";
+    cout << "===========================================================\n";
+    cout << left << setw(35) << "Total estudiantes en base:" << right << setw(10) << total << "\n";
+    cout << left << setw(35) << "Estudiantes con asignaturas/notas:" << right << setw(10) << conNotas
+         << " (" << fixed << setprecision(1) << (conNotas * 100.0 / total) << "%)\n";
+    cout << left << setw(35) << "Estudiantes sin notas (sin alerta):" << right << setw(10) << sinNotas
+         << " (" << fixed << setprecision(1) << pctSinNotas << "%)\n";
+    cout << string(59, '-') << "\n";
+    cout << left << setw(35) << "EN RIESGO ERRA (Promedio < 3.25):" << right << setw(10) << enErra
+         << " (" << fixed << setprecision(1) << pctErraTotal << "% total | " << pctErraConNotas << "% con notas)\n";
+    cout << left << setw(35) << "DESEMPENO SATISFACTORIO (>= 3.25):" << right << setw(10) << sinRiesgo
+         << " (" << fixed << setprecision(1) << pctSinRiesgo << "% con notas)\n";
+    cout << string(59, '-') << "\n";
+    cout << left << setw(35) << "Promedio acumulado institucional:" << right << setw(10) << fixed << setprecision(2) << promGlobal << " / 5.00\n";
+    cout << left << setw(35) << "Tiempo de procesamiento:" << right << setw(10) << fixed << setprecision(4) << dur.count() << " segundos\n";
+    cout << "===========================================================\n";
+
+    // Muestra representativa de 10 estudiantes
+    cout << "\n--- MUESTRA REPRESENTATIVA DE EVALUACION (10 Estudiantes) ---\n";
+    cout << left << setw(13) << "ID"
+         << setw(26) << "Nombre"
+         << setw(10) << "Programa"
+         << setw(10) << "Materias"
+         << setw(10) << "Promedio"
+         << setw(15) << "Estado ERRA" << "\n";
+    cout << string(84, '-') << "\n";
+
+    size_t muestra = min(size_t(10), estudiantes.size());
+    for (size_t i = 0; i < muestra; ++i) {
+        const auto& e = estudiantes[i];
+        float prom = calcularPromedio(e);
+        string erraStr;
+        if (e.matriculas.empty()) {
+            erraStr = "Sin notas";
+        } else if (estaEnRiesgoEbra(e)) {
+            erraStr = "[ALERTA ERRA]";
+        } else {
+            erraStr = "OK";
+        }
+        string nomCorto = (e.nombreCompleto.size() > 24) ? e.nombreCompleto.substr(0, 22) + ".." : e.nombreCompleto;
+        cout << left << setw(13) << e.identificacion
+             << setw(26) << nomCorto
+             << setw(10) << e.codigoPrograma
+             << setw(10) << e.matriculas.size()
+             << setw(10) << fixed << setprecision(2) << prom
+             << setw(15) << erraStr << "\n";
+    }
+    cout << "===========================================================\n";
+}
+
+

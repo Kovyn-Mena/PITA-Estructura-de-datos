@@ -65,8 +65,12 @@ def cargar_programas(ruta):
 def guardar_cursos(cursos, ruta):
     with open(ruta, "w", encoding="utf-8") as archivo:
         for c in cursos:
+            dia = getattr(c, "dia", "")
+            h_ini = getattr(c, "hora_inicio", 0)
+            h_fin = getattr(c, "hora_fin", 0)
+            salon = getattr(c, "salon", "")
             archivo.write(f"{c.codigo}|{c.nombre}|{c.creditos}|{c.codigo_profesor}|"
-                          f"{c.codigo_programa}|{1 if c.activo else 0}\n")
+                          f"{c.codigo_programa}|{1 if c.activo else 0}|{dia}|{h_ini}|{h_fin}|{salon}\n")
 
 
 def cargar_cursos(ruta):
@@ -81,9 +85,14 @@ def cargar_cursos(ruta):
             campos = linea.split("|")
             if len(campos) < 6:
                 continue
-            codigo, nombre, creditos, codigo_profesor, codigo_programa, activo = campos
+            codigo, nombre, creditos, codigo_profesor, codigo_programa, activo = campos[:6]
+            dia = campos[6] if len(campos) > 6 else ""
+            h_ini = int(campos[7]) if len(campos) > 7 and campos[7] else 0
+            h_fin = int(campos[8]) if len(campos) > 8 and campos[8] else 0
+            salon = campos[9] if len(campos) > 9 else ""
             resultado.append(Curso(codigo, nombre, int(creditos), codigo_profesor,
-                                    codigo_programa, activo == "1"))
+                                   codigo_programa, activo == "1",
+                                   dia=dia, hora_inicio=h_ini, hora_fin=h_fin, salon=salon))
     return resultado
 
 
@@ -121,8 +130,9 @@ def cargar_estudiantes(ruta_est, ruta_matriculas):
             resultado.append(Estudiante(identificacion, nombre, codigo_programa,
                                          estado, activo == "1"))
 
-    # Segunda pasada: cargar matriculas y asociarlas al estudiante correcto
+    # Segunda pasada: cargar matriculas y asociarlas al estudiante correcto (O(1) por hash map)
     if os.path.exists(ruta_matriculas):
+        mapa_estudiantes = {e.identificacion: e for e in resultado}
         with open(ruta_matriculas, "r", encoding="utf-8") as archivo:
             for linea in archivo:
                 linea = linea.strip()
@@ -132,10 +142,10 @@ def cargar_estudiantes(ruta_est, ruta_matriculas):
                 if len(campos) < 3:
                     continue
                 id_estudiante, codigo_curso, nota = campos
-                for e in resultado:
-                    if e.identificacion == id_estudiante:
-                        e.matriculas.append({"codigo_curso": codigo_curso, "nota": float(nota)})
-                        break
+                e = mapa_estudiantes.get(id_estudiante)
+                if e is not None:
+                    e.matriculas.append({"codigo_curso": codigo_curso, "nota": float(nota)})
+        del mapa_estudiantes
 
     return resultado
 

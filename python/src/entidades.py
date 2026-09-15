@@ -29,13 +29,18 @@ class Programa:
 
 class Curso:
     """TAD Curso: Asignatura perteneciente a un programa y asignada a un docente."""
-    def __init__(self, codigo, nombre, creditos, codigo_profesor, codigo_programa, activo=True):
+    def __init__(self, codigo, nombre, creditos, codigo_profesor, codigo_programa, activo=True,
+                 dia="", hora_inicio=0, hora_fin=0, salon=""):
         self.codigo = codigo
         self.nombre = nombre
         self.creditos = creditos
         self.codigo_profesor = codigo_profesor
         self.codigo_programa = codigo_programa
         self.activo = activo
+        self.dia = dia
+        self.hora_inicio = hora_inicio
+        self.hora_fin = hora_fin
+        self.salon = salon
 
 
 class Estudiante:

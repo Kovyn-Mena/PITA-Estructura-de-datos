@@ -56,6 +56,10 @@ struct Curso {
     std::string codigoProfesor;
     std::string codigoPrograma;
     bool activo;
+    std::string dia;
+    int horaInicio;
+    int horaFin;
+    std::string salon;
 };
 
 // ---------- Programa academico ----------

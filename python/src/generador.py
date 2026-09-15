@@ -242,6 +242,24 @@ PROGRAMAS_POR_FACULTAD = [
     ],
 ]
 
+DIAS_SEMANA = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"]
+FRANJAS_HORARIAS = [
+    (6, 8),
+    (8, 10),
+    (10, 12),
+    (14, 16),
+    (16, 18),
+    (18, 20),
+    (20, 22),
+]
+
+SALONES_DEF = [
+    f"{ed}-{piso}{num:02d}"
+    for ed in "ABCDEFGHIJ"
+    for piso in range(1, 5)
+    for num in range(1, 11)
+]
+
 
 def generar_datos_masivos():
     """Genera en memoria las estructuras completas requeridas por Parcial 1."""
@@ -331,8 +349,10 @@ def generar_datos_masivos():
     print("  [4/5] Generando 7.500 materias (50 por programa con profesor asignado)...")
     cursos = []
     cod_curso_num = 1
+    cursos_por_prog = {}
     for prog in programas:
         lista_profs = profesores_por_prog[prog.codigo]
+        lista_cursos_prog = []
         for c_idx in range(50):
             cod_cur = f"CUR{cod_curso_num:05d}"
             cod_curso_num += 1
@@ -351,11 +371,18 @@ def generar_datos_masivos():
                 codigo_programa=prog.codigo,
                 activo=activo,
             ))
+            lista_cursos_prog.append(cod_cur)
+        cursos_por_prog[prog.codigo] = lista_cursos_prog
 
-    print("  [5/5] Generando 225.000 estudiantes (1.500 por programa)...")
+    print("  [4.1] Generando horarios academicos libres de conflicto para 7.500 materias...")
+    generar_horarios_cursos(cursos)
+
+    print("  [5/5] Generando 225.000 estudiantes (1.500 por programa) con matriculas y calificaciones...")
     estudiantes = []
     cod_est_num = 1000000001
     for prog in programas:
+        lista_cur = cursos_por_prog[prog.codigo]
+        len_cur = len(lista_cur)
         for _ in range(1500):
             id_est = str(cod_est_num)
             cod_est_num += 1
@@ -371,13 +398,33 @@ def generar_datos_masivos():
                 estado = "Inactivo"
                 activo = False
 
-            estudiantes.append(Estudiante(
+            est = Estudiante(
                 identificacion=id_est,
                 nombre_completo=nom,
                 codigo_programa=prog.codigo,
                 estado=estado,
                 activo=activo,
-            ))
+            )
+
+            # Asignacion de matriculas y calificaciones (ERRA: promedio < 3.25)
+            # ~95% de estudiantes tienen 3-4 materias con notas
+            # ~5% sin materias (recien matriculados / inactivos sin registro)
+            if rand_est <= 95 and len_cur > 0:
+                riesgo_rand = rng.randint(1, 100)
+                if riesgo_rand <= 22:
+                    base_promedio = rng.uniform(1.8, 3.20)
+                else:
+                    base_promedio = rng.uniform(3.30, 4.80)
+
+                num_cursos = rng.randint(3, 4)
+                start_offset = rng.randint(0, len_cur - 1)
+                for k in range(num_cursos):
+                    cod_c = lista_cur[(start_offset + k) % len_cur]
+                    nota = base_promedio + rng.uniform(-0.35, 0.35)
+                    nota = max(1.0, min(5.0, round(nota, 1)))
+                    est.matriculas.append({"codigo_curso": cod_c, "nota": nota})
+
+            estudiantes.append(est)
 
     return facultades, programas, profesores, cursos, estudiantes
 
@@ -446,3 +493,239 @@ def menu_generacion_masiva(
     print(f" - Cursos:      {len(cursos)}")
     print(f" - Estudiantes: {len(estudiantes)}")
     print("Archivos actualizados correctamente en carpeta data/.")
+
+
+def generar_horarios_cursos(cursos):
+    """Asigna horarios y aulas sin conflictos para cada asignatura de la lista."""
+    num_salones = len(SALONES_DEF)
+    num_franjas = len(FRANJAS_HORARIAS)
+    num_slots = len(DIAS_SEMANA) * num_franjas
+
+    prof_ocupado = {}
+    salon_ocupado = {}
+
+    rng = random.Random(987654)
+    asignados = 0
+
+    for c in cursos:
+        prof_id = c.codigo_profesor
+        start_slot = rng.randint(0, num_slots - 1)
+        start_salon = rng.randint(0, num_salones - 1)
+        asignado = False
+
+        for s_step in range(num_slots):
+            slot = (start_slot + s_step) % num_slots
+            mask = 1 << slot
+
+            if prof_id and (prof_ocupado.get(prof_id, 0) & mask):
+                continue
+
+            for r_step in range(num_salones):
+                sal_idx = (start_salon + r_step) % num_salones
+                sal = SALONES_DEF[sal_idx]
+
+                if not (salon_ocupado.get(sal, 0) & mask):
+                    if prof_id:
+                        prof_ocupado[prof_id] = prof_ocupado.get(prof_id, 0) | mask
+                    salon_ocupado[sal] = salon_ocupado.get(sal, 0) | mask
+
+                    d_idx = slot // num_franjas
+                    f_idx = slot % num_franjas
+
+                    c.dia = DIAS_SEMANA[d_idx]
+                    c.hora_inicio = FRANJAS_HORARIAS[f_idx][0]
+                    c.hora_fin = FRANJAS_HORARIAS[f_idx][1]
+                    c.salon = sal
+
+                    asignado = True
+                    asignados += 1
+                    break
+            if asignado:
+                break
+
+    return asignados
+
+
+def menu_generacion_horarios(cursos, ruta_cursos):
+    """Menú interactivo de consola para generar y guardar horarios de cursos."""
+    print("\n===========================================================")
+    print("      GENERACION AUTOMATICA DE HORARIOS ACADEMICOS         ")
+    print("===========================================================")
+    print(f"Total de materias a programar: {len(cursos):,}")
+    print("Parametros de franjas y aulas:")
+    print(" - Dias: Lunes a Sabado (6 dias)")
+    print(" - Franjas horarias: 06:00 a 22:00 (bloques de 2 horas)")
+    print(" - Salones disponibles: 400 aulas (Edificios A al J)")
+    print(" - Control de conflictos: 0 colisiones en profesor o aula")
+
+    resp = leer_si_no("\nDesea generar y guardar los horarios de las materias? (s/n): ")
+    if resp != "s":
+        print("Operacion cancelada. No se modificaron los horarios.")
+        return
+
+    print("\nGenerando horarios academicos libres de conflicto...")
+    t0 = time.time()
+    asignados = generar_horarios_cursos(cursos)
+    guardar_cursos(cursos, ruta_cursos)
+    t1 = time.time()
+
+    print("\n===========================================================")
+    print("      HORARIOS GENERADOS Y GUARDADOS CON EXITO             ")
+    print("===========================================================")
+    print(f"Materias procesadas:           {len(cursos):,}")
+    print(f"Materias con horario asignado: {asignados:,}")
+    print("Conflictos profesor / franja : 0")
+    print("Conflictos salon / franja    : 0")
+    print(f"Tiempo de ejecucion:           {t1 - t0:.3f} segundos.")
+    print(f"Archivo de datos actualizado:  {ruta_cursos}")
+
+    # Muestra automatica de 4 ejemplos de cursos con horario
+    print("\n--- EJEMPLOS DE ASIGNATURAS CON HORARIO ASIGNADO ---")
+    print(f"{'Codigo':<10} {'Nombre Asignatura':<33} {'Programa':<10} {'Profesor':<12} {'Dia':<12} {'Horario':<15} {'Salon':<10}")
+    print("-" * 102)
+
+    mostrados = 0
+    for c in cursos:
+        if getattr(c, "hora_inicio", 0) > 0:
+            franja = f"{c.hora_inicio}:00-{c.hora_fin}:00"
+            nom = (c.nombre[:31] + "..") if len(c.nombre) > 33 else c.nombre
+            dia_str = getattr(c, "dia", "") or "N/A"
+            sal_str = getattr(c, "salon", "") or "N/A"
+            print(f"{c.codigo:<10} {nom:<33} {c.codigo_programa:<10} {c.codigo_profesor:<12} {dia_str:<12} {franja:<15} {sal_str:<10}")
+            mostrados += 1
+            if mostrados >= 4:
+                break
+
+
+def consultar_horario_curso(cursos):
+    """Permite consultar el horario de un curso específico o muestra una tabla representativa."""
+    if not cursos:
+        print("\nNo hay cursos registrados.")
+        return
+
+    print("\n--- CONSULTA DE HORARIOS DE ASIGNATURAS ---")
+    codigo = input("Ingrese codigo del curso (ej: CUR00001) o presione ENTER para ver muestra: ").strip()
+
+    if not codigo or codigo.lower() == "muestra":
+        print("\n--- MUESTRA REPRESENTATIVA DE HORARIOS (10 Asignaturas) ---")
+        print(f"{'Codigo':<10} {'Nombre Asignatura':<35} {'Dia':<12} {'Franja':<14} {'Salon':<10} {'Profesor':<12} {'Programa':<10}")
+        print("-" * 103)
+        muestra = cursos[:10]
+        for c in muestra:
+            franja = f"{c.hora_inicio}:00 - {c.hora_fin}:00" if getattr(c, "hora_inicio", 0) > 0 else "Sin horario"
+            dia_str = getattr(c, "dia", "") or "N/A"
+            sal_str = getattr(c, "salon", "") or "N/A"
+            nom = c.nombre[:32] + ".." if len(c.nombre) > 34 else c.nombre
+            print(f"{c.codigo:<10} {nom:<35} {dia_str:<12} {franja:<14} {sal_str:<10} {c.codigo_profesor:<12} {c.codigo_programa:<10}")
+        return
+
+    encontrado = None
+    for c in cursos:
+        if c.codigo.upper() == codigo.upper():
+            encontrado = c
+            break
+
+    if encontrado:
+        c = encontrado
+        print("\n=======================================================")
+        print(f"FICHA DE HORARIO - {c.codigo}")
+        print("=======================================================")
+        print(f"Asignatura    : {c.nombre}")
+        print(f"Creditos      : {c.creditos}")
+        print(f"Programa      : {c.codigo_programa}")
+        print(f"Profesor      : {c.codigo_profesor}")
+        dia = getattr(c, "dia", "") or "(Sin horario)"
+        print(f"Dia           : {dia}")
+        if getattr(c, "hora_inicio", 0) > 0:
+            print(f"Horario       : {c.hora_inicio}:00 a {c.hora_fin}:00")
+        else:
+            print("Horario       : (Sin horario)")
+        salon = getattr(c, "salon", "") or "(Sin salon)"
+        print(f"Aula/Salon    : {salon}")
+        estado = "Activo" if c.activo else "Inactivo"
+        print(f"Estado        : {estado}")
+        print("=======================================================")
+    else:
+        print(f"Curso con codigo {codigo} no encontrado.")
+
+
+def evaluar_erra_masivo(estudiantes):
+    """Evalúa masivamente la alerta institucional ERRA (promedio acumulado < 3.25)
+    en todos los estudiantes registrados.
+    """
+    if not estudiantes:
+        print("\nNo hay estudiantes registrados en el sistema para evaluar.")
+        return
+
+    print("\n===========================================================")
+    print("     EVALUACION MASIVA DE RENDIMIENTO ACADEMICO (ERRA)     ")
+    print("===========================================================")
+    print("Criterio institucional : Promedio acumulado < 3.25")
+    print("Regla de proteccion    : Estudiantes sin notas no generan alerta")
+    print(f"Total de estudiantes   : {len(estudiantes):,}")
+    print("-----------------------------------------------------------")
+    print("Evaluando desempeno academico institucional...")
+
+    t0 = time.time()
+
+    total = len(estudiantes)
+    con_notas = 0
+    sin_notas = 0
+    en_erra = 0
+    sin_riesgo = 0
+    suma_promedios = 0.0
+
+    for e in estudiantes:
+        if not e.matriculas:
+            sin_notas += 1
+        else:
+            con_notas += 1
+            prom = e.calcular_promedio()
+            suma_promedios += prom
+            if e.esta_en_riesgo_ebra():
+                en_erra += 1
+            else:
+                sin_riesgo += 1
+
+    t1 = time.time()
+    dur = t1 - t0
+
+    prom_global = (suma_promedios / con_notas) if con_notas > 0 else 0.0
+    pct_erra_total = (en_erra * 100.0) / total
+    pct_erra_con_notas = (en_erra * 100.0 / con_notas) if con_notas > 0 else 0.0
+    pct_sin_riesgo = (sin_riesgo * 100.0 / con_notas) if con_notas > 0 else 0.0
+    pct_sin_notas = (sin_notas * 100.0) / total
+
+    print("\n===========================================================")
+    print("          RESUMEN CONSOLIDADO DE ALERTA ERRA               ")
+    print("===========================================================")
+    print(f"{'Total estudiantes en base:':<35} {total:>10,}")
+    print(f"{'Estudiantes con asignaturas/notas:':<35} {con_notas:>10,} ({con_notas * 100.0 / total:.1f}%)")
+    print(f"{'Estudiantes sin notas (sin alerta):':<35} {sin_notas:>10,} ({pct_sin_notas:.1f}%)")
+    print("-" * 59)
+    print(f"{'EN RIESGO ERRA (Promedio < 3.25):':<35} {en_erra:>10,} ({pct_erra_total:.1f}% total | {pct_erra_con_notas:.1f}% con notas)")
+    print(f"{'DESEMPENO SATISFACTORIO (>= 3.25):':<35} {sin_riesgo:>10,} ({pct_sin_riesgo:.1f}% con notas)")
+    print("-" * 59)
+    print(f"{'Promedio acumulado institucional:':<35} {prom_global:>10.2f} / 5.00")
+    print(f"{'Tiempo de procesamiento:':<35} {dur:>10.4f} segundos")
+    print("===========================================================")
+
+    # Muestra representativa de 10 estudiantes
+    print("\n--- MUESTRA REPRESENTATIVA DE EVALUACION (10 Estudiantes) ---")
+    print(f"{'ID':<13} {'Nombre':<26} {'Programa':<10} {'Materias':<10} {'Promedio':<10} {'Estado ERRA':<15}")
+    print("-" * 84)
+
+    muestra = estudiantes[:10]
+    for e in muestra:
+        prom = e.calcular_promedio()
+        if not e.matriculas:
+            erra_str = "Sin notas"
+        elif e.esta_en_riesgo_ebra():
+            erra_str = "[ALERTA ERRA]"
+        else:
+            erra_str = "OK"
+        nom_corto = (e.nombre_completo[:22] + "..") if len(e.nombre_completo) > 24 else e.nombre_completo
+        print(f"{e.identificacion:<13} {nom_corto:<26} {e.codigo_programa:<10} {len(e.matriculas):<10} {prom:<10.2f} {erra_str:<15}")
+    print("===========================================================")
+
+

@@ -34,4 +34,16 @@ void menuGeneracionMasiva(
     const std::string& rutaProfesores
 );
 
+// Genera horarios libres de conflictos para una lista de asignaturas/cursos
+int generarHorariosCursos(std::vector<Curso>& cursos);
+
+// Menu interactivo para generar horarios y guardarlos en persistencia
+void menuGeneracionHorarios(std::vector<Curso>& cursos, const std::string& rutaCursos);
+
+// Consulta interactiva de horario por codigo de curso o muestra
+void consultarHorarioCurso(const std::vector<Curso>& cursos);
+
+// Evaluacion masiva de rendimiento academico (ERRA / EBRA: promedio < 3.25)
+void evaluarErraMasivo(const std::vector<Estudiante>& estudiantes);
+
 #endif

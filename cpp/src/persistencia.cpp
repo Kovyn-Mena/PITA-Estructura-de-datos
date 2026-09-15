@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <unordered_map>
 
 using namespace std;
 
@@ -109,7 +110,8 @@ void guardarCursos(const vector<Curso>& v, const string& ruta) {
     for (const auto& c : v) {
         archivo << c.codigo << "|" << c.nombre << "|" << c.creditos << "|"
                 << c.codigoProfesor << "|" << c.codigoPrograma << "|"
-                << (c.activo ? 1 : 0) << "\n";
+                << (c.activo ? 1 : 0) << "|" << c.dia << "|"
+                << c.horaInicio << "|" << c.horaFin << "|" << c.salon << "\n";
     }
     archivo.close();
 }
@@ -131,6 +133,17 @@ vector<Curso> cargarCursos(const string& ruta) {
         c.codigoProfesor = campos[3];
         c.codigoPrograma = campos[4];
         c.activo = (campos[5] == "1");
+        if (campos.size() >= 10) {
+            c.dia = campos[6];
+            c.horaInicio = campos[7].empty() ? 0 : stoi(campos[7]);
+            c.horaFin = campos[8].empty() ? 0 : stoi(campos[8]);
+            c.salon = campos[9];
+        } else {
+            c.dia = "";
+            c.horaInicio = 0;
+            c.horaFin = 0;
+            c.salon = "";
+        }
         resultado.push_back(c);
     }
     archivo.close();
@@ -189,23 +202,27 @@ vector<Estudiante> cargarEstudiantes(const string& rutaEst, const string& rutaMa
     }
     archivoEst.close();
 
-    // Segunda pasada: cargar matriculas y asociarlas al estudiante correcto
+    // Segunda pasada: cargar matriculas y asociarlas al estudiante correcto (O(1) por indice)
     ifstream archivoMat(rutaMatriculas);
     if (archivoMat.is_open()) {
+        unordered_map<string, size_t> mapaEstudiantes;
+        mapaEstudiantes.reserve(resultado.size());
+        for (size_t i = 0; i < resultado.size(); ++i) {
+            mapaEstudiantes[resultado[i].identificacion] = i;
+        }
+
         while (getline(archivoMat, linea)) {
             if (linea.empty()) continue;
             vector<string> campos = split(linea, '|');
             if (campos.size() < 3) continue;
-            string idEstudiante = campos[0];
+            const string& idEstudiante = campos[0];
             Matricula m;
             m.codigoCurso = campos[1];
             m.nota = stof(campos[2]);
 
-            for (auto& e : resultado) {
-                if (e.identificacion == idEstudiante) {
-                    e.matriculas.push_back(m);
-                    break;
-                }
+            auto it = mapaEstudiantes.find(idEstudiante);
+            if (it != mapaEstudiantes.end()) {
+                resultado[it->second].matriculas.push_back(m);
             }
         }
         archivoMat.close();

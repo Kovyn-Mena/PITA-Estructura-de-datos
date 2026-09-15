@@ -195,11 +195,14 @@ def listar_cursos(cursos):
     if not cursos:
         print("(no hay cursos registrados)")
         return
-    for c in cursos:
+    limite = min(50, len(cursos))
+    for c in cursos[:limite]:
         estado = "Activo" if c.activo else "Inactivo"
         profesor = c.codigo_profesor if c.codigo_profesor else "(sin asignar)"
         print(f"{c.codigo} | {c.nombre} | {c.creditos} creditos | "
               f"Programa: {c.codigo_programa} | Profesor: {profesor} | {estado}")
+    if len(cursos) > 50:
+        print(f"\n[Nota: Se muestran los primeros 50 de {len(cursos):,} cursos para optimizar memoria de consola. Use 'Consultar horario de curso' para ver detalles especificos].")
 
 
 def buscar_curso(cursos, codigo):
@@ -275,10 +278,13 @@ def listar_estudiantes(estudiantes):
     if not estudiantes:
         print("(no hay estudiantes registrados)")
         return
-    for e in estudiantes:
+    limite = min(50, len(estudiantes))
+    for e in estudiantes[:limite]:
         estado_activo = "Activo" if e.activo else "Inactivo"
         print(f"{e.identificacion} | {e.nombre_completo} | Programa: {e.codigo_programa} | "
               f"{e.estado} | {estado_activo} | Cursos matriculados: {len(e.matriculas)}")
+    if len(estudiantes) > 50:
+        print(f"\n[Nota: Se muestran los primeros 50 de {len(estudiantes):,} estudiantes para optimizar memoria de consola. Use 'Ver ficha' para consultar un estudiante especifico].")
 
 
 def buscar_estudiante(estudiantes, identificacion):
@@ -475,11 +481,14 @@ def listar_profesores(profesores):
     if not profesores:
         print("(no hay profesores registrados)")
         return
-    for p in profesores:
+    limite = min(50, len(profesores))
+    for p in profesores[:limite]:
         estado = "Activo" if p.activo else "Inactivo"
         posg = f" | Posg: {p.posgrado}" if getattr(p, "posgrado", "") else ""
         print(f"{p.identificacion} | {p.nombre_completo} | {p.tipo_vinculacion} | "
               f"{p.dedicacion} | {p.categoria_escalafon}{posg} | Programa: {p.codigo_programa} | {estado}")
+    if len(profesores) > 50:
+        print(f"\n[Nota: Se muestran los primeros 50 de {len(profesores):,} profesores para optimizar memoria de consola. Use 'Ver desglose individual de nomina' para consultar un docente especifico].")
 
 
 def buscar_profesor(profesores, identificacion):

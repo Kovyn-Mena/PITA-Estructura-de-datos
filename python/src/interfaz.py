@@ -18,17 +18,64 @@ except ImportError:
     _ES_WINDOWS = False
 
 
+class Colores:
+    RESET   = "\033[0m"
+    BOLD    = "\033[1m"
+    DIM     = "\033[2m"
+    CYAN    = "\033[36m"
+    GREEN   = "\033[32m"
+    YELLOW  = "\033[33m"
+    RED     = "\033[31m"
+    BLUE    = "\033[34m"
+    MAGENTA = "\033[35m"
+
+
 def limpiar_pantalla():
     os.system("cls" if os.name == "nt" else "clear")
+
+
+def encabezado_principal():
+    print(f"{Colores.CYAN}{Colores.BOLD}"
+          f"============================================================\n"
+          f"                    PARCIAL 1\n"
+          f"              SISTEMA UNIVERSITARIO\n"
+          f"============================================================{Colores.RESET}")
+
+
+def titulo_seccion(titulo):
+    print(f"\n{Colores.CYAN}{Colores.BOLD}--- {titulo} ---{Colores.RESET}")
+
+
+def separador(ancho=60):
+    print(f"{Colores.DIM}{'-' * ancho}{Colores.RESET}")
+
+
+def mensaje_exito(msg):
+    print(f"{Colores.GREEN}{Colores.BOLD}[OK] {Colores.RESET}{Colores.GREEN}{msg}{Colores.RESET}")
+
+
+def mensaje_error(msg):
+    print(f"{Colores.RED}{Colores.BOLD}[ERROR] {Colores.RESET}{Colores.RED}{msg}{Colores.RESET}")
+
+
+def mensaje_info(msg):
+    print(f"{Colores.CYAN}[i] {Colores.RESET}{msg}")
+
+
+def mensaje_alerta(msg):
+    print(f"{Colores.YELLOW}{Colores.BOLD}[!] {Colores.RESET}{Colores.YELLOW}{msg}{Colores.RESET}")
 
 
 def _leer_caracter_inmediato():
     """Lee UN SOLO caracter sin esperar ENTER. Funcion 'privada' de este
     modulo (empieza con _): solo la usan las funciones publicas de aqui abajo."""
-    if _ES_WINDOWS:
+    if _ES_WINDOWS and sys.stdin.isatty():
         c = msvcrt.getch().decode("utf-8", errors="ignore")
         print(c, end="", flush=True)  # msvcrt no muestra el caracter, lo mostramos nosotros
         return c
+    elif _ES_WINDOWS:
+        ch = sys.stdin.read(1)
+        return ch if ch else "\n"
     else:
         fd = sys.stdin.fileno()
         try:
@@ -52,6 +99,19 @@ def pausar():
     print("\nPresione una tecla para continuar...", end="", flush=True)
     _leer_caracter_inmediato()
     print()
+
+
+def leer_opcion_menu(mensaje):
+    """Lee un caracter de opcion de menu alfanumerico (ej: 0-9, a, r)."""
+    while True:
+        print(mensaje, end="", flush=True)
+        c = _leer_caracter_inmediato()
+        print()
+        if c in ("\n", "\r", ""):
+            return "0"
+        if c.isalnum():
+            return c.lower()
+        print("Opcion invalida. Ingrese una de las opciones mostradas.")
 
 
 def leer_opcion_inmediata(mensaje):

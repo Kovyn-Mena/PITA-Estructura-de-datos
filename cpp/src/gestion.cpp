@@ -221,11 +221,17 @@ void listarCursos(const vector<Curso>& cursos) {
         cout << "(no hay cursos registrados)\n";
         return;
     }
-    for (const auto& c : cursos) {
+    size_t limite = min(size_t(50), cursos.size());
+    for (size_t i = 0; i < limite; ++i) {
+        const auto& c = cursos[i];
         cout << c.codigo << " | " << c.nombre << " | " << c.creditos << " creditos"
              << " | Programa: " << c.codigoPrograma
              << " | Profesor: " << (c.codigoProfesor.empty() ? "(sin asignar)" : c.codigoProfesor)
              << " | " << (c.activo ? "Activo" : "Inactivo") << "\n";
+    }
+    if (cursos.size() > 50) {
+        cout << "\n[Nota: Se muestran los primeros 50 de " << cursos.size()
+             << " cursos para optimizar memoria de consola. Use 'Consultar horario de curso' para ver detalles especificos].\n";
     }
 }
 
@@ -306,12 +312,18 @@ void listarEstudiantes(const vector<Estudiante>& estudiantes) {
         cout << "(no hay estudiantes registrados)\n";
         return;
     }
-    for (const auto& e : estudiantes) {
+    size_t limite = min(size_t(50), estudiantes.size());
+    for (size_t i = 0; i < limite; ++i) {
+        const auto& e = estudiantes[i];
         cout << e.identificacion << " | " << e.nombreCompleto
              << " | Programa: " << e.codigoPrograma
              << " | " << e.estado
              << " | " << (e.activo ? "Activo" : "Inactivo")
              << " | Cursos matriculados: " << e.matriculas.size() << "\n";
+    }
+    if (estudiantes.size() > 50) {
+        cout << "\n[Nota: Se muestran los primeros 50 de " << estudiantes.size()
+             << " estudiantes para optimizar memoria de consola. Use 'Ver ficha' para consultar un estudiante especifico].\n";
     }
 }
 
@@ -544,7 +556,9 @@ void listarProfesores(const vector<Profesor>& profesores) {
         cout << "(no hay profesores registrados)\n";
         return;
     }
-    for (const auto& p : profesores) {
+    size_t limite = min(size_t(50), profesores.size());
+    for (size_t i = 0; i < limite; ++i) {
+        const auto& p = profesores[i];
         cout << p.identificacion << " | " << p.nombreCompleto
              << " | Programa: " << p.codigoPrograma
              << " | " << p.tipoVinculacion << " (" << p.dedicacion << ")";
@@ -552,6 +566,10 @@ void listarProfesores(const vector<Profesor>& profesores) {
         if (!p.posgrado.empty()) cout << " | Posg: " << p.posgrado;
         if (p.adHonorem) cout << " | AD-HONOREM";
         cout << " | " << (p.activo ? "Activo" : "Inactivo") << "\n";
+    }
+    if (profesores.size() > 50) {
+        cout << "\n[Nota: Se muestran los primeros 50 de " << profesores.size()
+             << " profesores para optimizar memoria de consola. Use 'Ver desglose individual' para consultar un docente especifico].\n";
     }
 }
 
