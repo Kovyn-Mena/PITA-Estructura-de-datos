@@ -3,6 +3,7 @@
 #include "../include/nomina.h"
 #include "../include/persistencia.h"
 #include "../include/interfaz.h"
+#include "../include/generador.h"
 #include <iostream>
 
 using namespace std;
@@ -197,7 +198,9 @@ void menuProfesores(vector<Profesor>& profesores, vector<Programa>& programas) {
         limpiarPantalla();
         cout << "\n--- Menu Profesores ---\n";
         cout << "1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar\n";
-        cout << "6. Ver desglose de nomina\n0. Volver (o presione ENTER)\n";
+        cout << "6. Ver desglose individual de nomina\n";
+        cout << "7. Calcular nomina universitaria masiva\n";
+        cout << "0. Volver (o presione ENTER)\n";
         opcion = leerOpcionInmediata("Opcion: ");
 
         string id;
@@ -226,6 +229,10 @@ void menuProfesores(vector<Profesor>& profesores, vector<Programa>& programas) {
             case 6:
                 cout << "Identificacion del profesor: "; cin >> id;
                 consultarProfesor(profesores, id);
+                pausar();
+                break;
+            case 7:
+                calcularNominaMasiva(profesores);
                 pausar();
                 break;
             case 0: break;
@@ -331,6 +338,7 @@ int main() {
         cout << "5. Gestionar Profesores\n";
         cout << "6. Gestionar Administrativos\n";
         cout << "7. Recargar datos desde archivo\n";
+        cout << "8. Generar datos aleatorios masivos (Parcial 1)\n";
         cout << "0. Guardar y salir (o presione ENTER)\n";
         opcionPrincipal = leerOpcionInmediata("Opcion: ");
 
@@ -372,6 +380,14 @@ int main() {
                 } else {
                     cout << "Operacion cancelada.\n";
                 }
+                pausar();
+                break;
+            case 8:
+                menuGeneracionMasiva(
+                    facultades, programas, cursos, estudiantes, profesores,
+                    RUTA_FACULTADES, RUTA_PROGRAMAS, RUTA_CURSOS,
+                    RUTA_ESTUDIANTES, RUTA_MATRICULAS, RUTA_PROFESORES
+                );
                 pausar();
                 break;
             case 0:

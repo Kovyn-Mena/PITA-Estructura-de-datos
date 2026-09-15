@@ -555,3 +555,160 @@ def imprimir_desglose_nomina_admin(admin):
     print(f"=================================================================")
 
 
+def calcular_nomina_masiva(profesores):
+    """Calcula y consolida el informe de nómina masiva universitaria (UPC)."""
+    if not profesores:
+        print("\n[!] No hay profesores registrados en el sistema.")
+        return
+
+    total = len(profesores)
+    count_planta = 0
+    count_ocasional = 0
+    count_catedratico = 0
+    count_validos = 0
+    count_adhonorem = 0
+    count_con_posgrado = 0
+    count_inactivos = 0
+
+    subtotal_planta = 0.0
+    subtotal_ocasional = 0.0
+    subtotal_catedratico = 0.0
+
+    tot_bruto = 0.0
+    tot_bonif = 0.0
+    tot_devengado = 0.0
+
+    tot_salud = 0
+    tot_pension = 0
+    tot_fsp = 0
+    tot_estampilla = 0
+    tot_retencion = 0
+    tot_deducciones = 0
+
+    tot_neto = 0.0
+    tot_prestaciones = 0.0
+
+    tot_aportes_pension = 0
+    tot_aportes_salud = 0
+    tot_aportes_arl = 0
+    tot_aportes_caja = 0
+    tot_aportes_patronales = 0
+
+    tot_costo_empleador = 0.0
+
+    for p in profesores:
+        tipo = p.tipo_vinculacion
+        if tipo == "Planta":
+            count_planta += 1
+        elif tipo == "Ocasional":
+            count_ocasional += 1
+        elif tipo == "Catedratico":
+            count_catedratico += 1
+
+        if getattr(p, "ad_honorem", False):
+            count_adhonorem += 1
+        if getattr(p, "posgrado", "") and getattr(p, "posgrado", "") != "Ninguno":
+            count_con_posgrado += 1
+        if not p.activo:
+            count_inactivos += 1
+
+        if liquidacion_disponible(p):
+            count_validos += 1
+
+        bruto = calcular_salario_bruto(p)
+        bonif = calcular_bonificacion_posgrado(p)
+        devengado = calcular_total_devengado(p)
+
+        salud = calcular_descuento_salud(bruto)
+        pension = calcular_descuento_pension(bruto)
+        fsp = calcular_descuento_fsp(bruto)
+        estampilla = calcular_descuento_estampilla(bruto)
+        retencion = calcular_retencion_fuente(devengado, salud, pension)
+        ded = salud + pension + fsp + estampilla + retencion
+        neto = devengado - ded
+
+        prest = calcular_total_prestaciones(bruto)
+        ap = calcular_aportes_patronales(bruto)
+        costo = bruto + ap["total"]
+
+        tot_bruto += bruto
+        tot_bonif += bonif
+        tot_devengado += devengado
+
+        tot_salud += salud
+        tot_pension += pension
+        tot_fsp += fsp
+        tot_estampilla += estampilla
+        tot_retencion += retencion
+        tot_deducciones += ded
+
+        tot_neto += neto
+        tot_prestaciones += prest
+
+        tot_aportes_pension += ap["pension"]
+        tot_aportes_salud += ap["salud"]
+        tot_aportes_arl += ap["arl"]
+        tot_aportes_caja += ap["caja"]
+        tot_aportes_patronales += ap["total"]
+
+        tot_costo_empleador += costo
+
+        if tipo == "Planta":
+            subtotal_planta += devengado
+        elif tipo == "Ocasional":
+            subtotal_ocasional += devengado
+        elif tipo == "Catedratico":
+            subtotal_catedratico += devengado
+
+    print("\n=================================================================")
+    print("        INFORME CONSOLIDADO DE NOMINA UNIVERSITARIA (UPC)        ")
+    print("=================================================================")
+    print(f"Total Profesores Procesados : {total:,}")
+    print(f" - Docentes de Planta       : {count_planta:,}")
+    print(f" - Docentes Ocasionales     : {count_ocasional:,}")
+    print(f" - Docentes Catedraticos    : {count_catedratico:,}")
+    print(f"Liquidaciones validas       : {count_validos:,} / {total:,}")
+    print("Condiciones especiales:")
+    print(f" - Docentes Ad-honorem      : {count_adhonorem:,}")
+    print(f" - Docentes con Posgrado    : {count_con_posgrado:,}")
+    print(f" - Docentes Inactivos       : {count_inactivos:,}")
+
+    print("\n--- DEVENGADOS CONSOLIDADOS (+) ---")
+    print(f"Total Salario Basico (Bruto): ${tot_bruto:,.0f} COP")
+    print(f"Total Bonif. Posgrado (027) : ${tot_bonif:,.0f} COP")
+    print("-----------------------------------------------------------------")
+    print(f"TOTAL NOMINA DEVENGADA      : ${tot_devengado:,.0f} COP")
+    print(f"  * Subtotal Planta         : ${subtotal_planta:,.0f} COP")
+    print(f"  * Subtotal Ocasional      : ${subtotal_ocasional:,.0f} COP")
+    print(f"  * Subtotal Catedratico    : ${subtotal_catedratico:,.0f} COP")
+
+    print("\n--- DEDUCCIONES DE LEY (-) ---")
+    print(f"Total Salud (4%)            : -${tot_salud:,.0f} COP")
+    print(f"Total Pension (4%)          : -${tot_pension:,.0f} COP")
+    print(f"Total FSP (1%)              : -${tot_fsp:,.0f} COP")
+    print(f"Total Estampilla (0.2%)     : -${tot_estampilla:,.0f} COP")
+    print(f"Total Retencion en la Fuente: -${tot_retencion:,.0f} COP")
+    print("-----------------------------------------------------------------")
+    print(f"TOTAL DEDUCCIONES EMPLEADOS : -${tot_deducciones:,.0f} COP")
+
+    print("\n=================================================================")
+    print(f">>> TOTAL NETO A TRANSFERIR A PROFESORES: ${tot_neto:,.0f} COP <<<")
+    print("=================================================================")
+
+    print("\n--- PROVISIONES DE PRESTACIONES SOCIALES ---")
+    print(f"Total Prestaciones Sociales : ${tot_prestaciones:,.0f} COP")
+
+    print("\n--- APORTES PATRONALES UPC (COSTO INSTITUCIONAL) ---")
+    print(f"Salud Patronal (8.5%)       : ${tot_aportes_salud:,.0f} COP")
+    print(f"Pension Patronal (12%)      : ${tot_aportes_pension:,.0f} COP")
+    print(f"ARL (0.522%)                : ${tot_aportes_arl:,.0f} COP")
+    print(f"Caja Compensacion (4%)      : ${tot_aportes_caja:,.0f} COP")
+    print("-----------------------------------------------------------------")
+    print(f"TOTAL APORTES PATRONALES UPC: ${tot_aportes_patronales:,.0f} COP")
+
+    print("\n=================================================================")
+    print(f">>> COSTO TOTAL EMPLEADOR (DEVENGADO + APORTES): ${tot_costo_empleador:,.0f} COP <<<")
+    print("=================================================================")
+
+
+

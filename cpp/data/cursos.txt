@@ -6,3 +6,45 @@ C0805|Redes de Computadores|3|P005|SIS|1
 C0806|Ingenieria de Software|3|P003|SIS|1
 C0807|Seminario de Investigacion|2|P006|SIS|1
 C0808|Electiva Profesional|2|P007|SIS|0
+C0101|Fundamentos de Administracion|3|P001|ADM|1
+C0102|Gestion Organizacional|3|P002|ADM|1
+C0201|Turismo y Hospitalidad|3|P003|AEH|1
+C0202|Gestion Hotelera|3|P004|AEH|1
+C0301|Comercio Exterior|3|P001|COM|1
+C0302|Finanzas Internacionales|3|P002|COM|1
+C0401|Contabilidad General|4|P003|CP|1
+C0402|Tributaria y Normas NIIF|3|P005|CP|1
+C0501|Microeconomia|3|P001|ECO|1
+C0502|Macroeconomia|3|P006|ECO|1
+C0601|Procesos Agroindustriales|3|P002|AGR|1
+C0602|Control de Calidad Alimentaria|3|P003|AGR|1
+C0701|Gestion Ambiental|3|P004|AMB|1
+C0702|Tratamiento de Aguas|3|P001|AMB|1
+C0901|Circuitos Electronicos|4|P002|ELE|1
+C0902|Electronica Digital|3|P003|ELE|1
+C1001|Fundamentos de Enfermeria|4|P005|ENF|1
+C1002|Cuidado al Paciente Critico|3|P006|ENF|1
+C1101|Anatomia Quirurgica|4|P001|IQ|1
+C1102|Tecnicas de Instrumentacion|3|P002|IQ|1
+C1201|Microbiologia General|4|P003|MIB|1
+C1202|Inmunologia Basica|3|P004|MIB|1
+C1301|Derecho Constitucional|3|P005|DER|1
+C1302|Derecho Civil|3|P006|DER|1
+C1401|Psicologia General|3|P001|PSI|1
+C1402|Psicologia del Desarrollo|3|P002|PSI|1
+C1501|Teoria Sociologica|3|P003|SOC|1
+C1502|Metodologia de la Investigacion Social|3|P004|SOC|1
+C1601|Historia del Arte|3|P005|ART|1
+C1602|Expresion Plastica|3|P006|ART|1
+C1701|Teoria Musical|3|P001|MUS|1
+C1702|Instrumento Principal|3|P002|MUS|1
+C1801|Calculo Diferencial|4|P003|MAT|1
+C1802|Algebra Lineal|3|P004|MAT|1
+C1901|Ingles I|3|P005|LEI|1
+C1902|Literatura Hispanoamericana|3|P006|LEI|1
+C2001|Literatura Colombiana|3|P001|LLC|1
+C2002|Linguistica General|3|P002|LLC|1
+C2101|Fundamentos de Educacion Fisica|3|P003|EDF|1
+C2102|Deporte y Salud|3|P004|EDF|1
+C2201|Ecologia y Medio Ambiente|3|P005|CNA|1
+C2202|Biologia Celular|3|P006|CNA|1

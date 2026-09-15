@@ -364,3 +364,128 @@ void imprimirDesgloseNominaAdmin(const Administrativo& a) {
     cout << ">>> NETO A PAGAR FUNCIONARIO: $" << neto << " COP <<<\n";
     cout << "=================================================================\n";
 }
+
+void calcularNominaMasiva(const vector<Profesor>& profesores) {
+    if (profesores.empty()) {
+        cout << "\n[!] No hay profesores registrados en el sistema.\n";
+        return;
+    }
+
+    size_t total = profesores.size();
+    int countPlanta = 0, countOcasional = 0, countCatedratico = 0;
+    int countValidos = 0, countAdHonorem = 0, countConPosgrado = 0, countInactivos = 0;
+
+    double subtotalPlanta = 0.0, subtotalOcasional = 0.0, subtotalCatedratico = 0.0;
+    double totBruto = 0.0, totBonif = 0.0, totDevengado = 0.0;
+    long long totSalud = 0, totPension = 0, totFsp = 0, totEstampilla = 0, totRetencion = 0, totDeducciones = 0;
+    double totNeto = 0.0;
+    double totPrestaciones = 0.0;
+    long long totAportesPension = 0, totAportesSalud = 0, totAportesArl = 0, totAportesCaja = 0, totAportesPatronales = 0;
+    double totCostoEmpleador = 0.0;
+
+    for (const auto& p : profesores) {
+        if (p.tipoVinculacion == "Planta") countPlanta++;
+        else if (p.tipoVinculacion == "Ocasional") countOcasional++;
+        else if (p.tipoVinculacion == "Catedratico") countCatedratico++;
+
+        if (p.adHonorem) countAdHonorem++;
+        if (!p.posgrado.empty() && p.posgrado != "Ninguno") countConPosgrado++;
+        if (!p.activo) countInactivos++;
+
+        if (liquidacionDisponible(p)) countValidos++;
+
+        double bruto = calcularSalarioBruto(p);
+        long long bonif = calcularBonificacionPosgrado(p);
+        double devengado = calcularTotalDevengado(p);
+
+        long long salud = calcularDescuentoSalud(bruto);
+        long long pension = calcularDescuentoPension(bruto);
+        long long fsp = calcularDescuentoFSP(bruto);
+        long long estampilla = calcularDescuentoEstampilla(bruto);
+        long long retencion = calcularRetencionFuente(devengado, salud, pension);
+        long long ded = salud + pension + fsp + estampilla + retencion;
+        double neto = devengado - ded;
+
+        double prest = calcularTotalPrestaciones(bruto);
+        AportesPatronales ap = calcularAportesPatronales(bruto);
+        double costo = bruto + ap.total;
+
+        totBruto += bruto;
+        totBonif += bonif;
+        totDevengado += devengado;
+
+        totSalud += salud;
+        totPension += pension;
+        totFsp += fsp;
+        totEstampilla += estampilla;
+        totRetencion += retencion;
+        totDeducciones += ded;
+
+        totNeto += neto;
+        totPrestaciones += prest;
+
+        totAportesPension += ap.pension;
+        totAportesSalud += ap.salud;
+        totAportesArl += ap.arl;
+        totAportesCaja += ap.caja;
+        totAportesPatronales += ap.total;
+
+        totCostoEmpleador += costo;
+
+        if (p.tipoVinculacion == "Planta") subtotalPlanta += devengado;
+        else if (p.tipoVinculacion == "Ocasional") subtotalOcasional += devengado;
+        else if (p.tipoVinculacion == "Catedratico") subtotalCatedratico += devengado;
+    }
+
+    cout << fixed << setprecision(0);
+    cout << "\n=================================================================\n";
+    cout << "        INFORME CONSOLIDADO DE NOMINA UNIVERSITARIA (UPC)        \n";
+    cout << "=================================================================\n";
+    cout << "Total Profesores Procesados : " << total << "\n";
+    cout << " - Docentes de Planta       : " << countPlanta << "\n";
+    cout << " - Docentes Ocasionales     : " << countOcasional << "\n";
+    cout << " - Docentes Catedraticos    : " << countCatedratico << "\n";
+    cout << "Liquidaciones validas       : " << countValidos << " / " << total << "\n";
+    cout << "Condiciones especiales:\n";
+    cout << " - Docentes Ad-honorem      : " << countAdHonorem << "\n";
+    cout << " - Docentes con Posgrado    : " << countConPosgrado << "\n";
+    cout << " - Docentes Inactivos       : " << countInactivos << "\n";
+
+    cout << "\n--- DEVENGADOS CONSOLIDADOS (+) ---\n";
+    cout << "Total Salario Basico (Bruto): $" << totBruto << " COP\n";
+    cout << "Total Bonif. Posgrado (027) : $" << totBonif << " COP\n";
+    cout << "-----------------------------------------------------------------\n";
+    cout << "TOTAL NOMINA DEVENGADA      : $" << totDevengado << " COP\n";
+    cout << "  * Subtotal Planta         : $" << subtotalPlanta << " COP\n";
+    cout << "  * Subtotal Ocasional      : $" << subtotalOcasional << " COP\n";
+    cout << "  * Subtotal Catedratico    : $" << subtotalCatedratico << " COP\n";
+
+    cout << "\n--- DEDUCCIONES DE LEY (-) ---\n";
+    cout << "Total Salud (4%)            : -$" << totSalud << " COP\n";
+    cout << "Total Pension (4%)          : -$" << totPension << " COP\n";
+    cout << "Total FSP (1%)              : -$" << totFsp << " COP\n";
+    cout << "Total Estampilla (0.2%)     : -$" << totEstampilla << " COP\n";
+    cout << "Total Retencion en la Fuente: -$" << totRetencion << " COP\n";
+    cout << "-----------------------------------------------------------------\n";
+    cout << "TOTAL DEDUCCIONES EMPLEADOS : -$" << totDeducciones << " COP\n";
+
+    cout << "\n=================================================================\n";
+    cout << ">>> TOTAL NETO A TRANSFERIR A PROFESORES: $" << totNeto << " COP <<<\n";
+    cout << "=================================================================\n";
+
+    cout << "\n--- PROVISIONES DE PRESTACIONES SOCIALES ---\n";
+    cout << "Total Prestaciones Sociales : $" << totPrestaciones << " COP\n";
+
+    cout << "\n--- APORTES PATRONALES UPC (COSTO INSTITUCIONAL) ---\n";
+    cout << "Salud Patronal (8.5%)       : $" << totAportesSalud << " COP\n";
+    cout << "Pension Patronal (12%)      : $" << totAportesPension << " COP\n";
+    cout << "ARL (0.522%)                : $" << totAportesArl << " COP\n";
+    cout << "Caja Compensacion (4%)      : $" << totAportesCaja << " COP\n";
+    cout << "-----------------------------------------------------------------\n";
+    cout << "TOTAL APORTES PATRONALES UPC: $" << totAportesPatronales << " COP\n";
+
+    cout << "\n=================================================================\n";
+    cout << ">>> COSTO TOTAL EMPLEADOR (DEVENGADO + APORTES): $" << totCostoEmpleador << " COP <<<\n";
+    cout << "=================================================================\n";
+}
+

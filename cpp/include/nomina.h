@@ -50,6 +50,7 @@ struct AportesPatronales {
 AportesPatronales calcularAportesPatronales(double salarioBruto);
 double calcularCostoTotalEmpleador(const Profesor& p);
 void imprimirDesgloseNomina(const Profesor& p);
+void calcularNominaMasiva(const std::vector<Profesor>& profesores);
 
 // ── Administrativos ──
 double salarioBaseAdministrativo(const std::string& categoria);

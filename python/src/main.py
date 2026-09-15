@@ -42,6 +42,8 @@ from persistencia import (
     guardar_administrativos, cargar_administrativos,
 )
 from interfaz import limpiar_pantalla, pausar, leer_opcion_inmediata, leer_si_no
+from generador import menu_generacion_masiva
+from nomina import calcular_nomina_masiva
 
 # Rutas ABSOLUTAS calculadas a partir de la ubicacion de este archivo, para
 # que el programa funcione sin importar desde que carpeta se ejecute
@@ -225,7 +227,8 @@ def menu_profesores(profesores, programas):
         limpiar_pantalla()
         print("\n--- Menu Profesores ---")
         print("1. Crear\n2. Listar\n3. Modificar\n4. Desactivar\n5. Eliminar")
-        print("6. Ver desglose de nomina")
+        print("6. Ver desglose individual de nomina")
+        print("7. Calcular nomina universitaria masiva")
         print("0. Volver (o presione ENTER)")
         opcion = leer_opcion_inmediata("Opcion: ")
 
@@ -253,6 +256,9 @@ def menu_profesores(profesores, programas):
         elif opcion == 6:
             identificacion = input("Identificacion del profesor: ").strip()
             consultar_profesor(profesores, identificacion)
+            pausar()
+        elif opcion == 7:
+            calcular_nomina_masiva(profesores)
             pausar()
         elif opcion == 0:
             break
@@ -344,6 +350,7 @@ def main():
         print("5. Gestionar Profesores")
         print("6. Gestionar Administrativos")
         print("7. Recargar datos desde archivo")
+        print("8. Generar datos aleatorios masivos (Parcial 1)")
         print("0. Guardar y salir (o presione ENTER)")
         opcion = leer_opcion_inmediata("Opcion: ")
 
@@ -373,6 +380,13 @@ def main():
                       f"{len(administrativos)} administrativo(s).")
             else:
                 print("Operacion cancelada.")
+            pausar()
+        elif opcion == 8:
+            menu_generacion_masiva(
+                facultades, programas, cursos, estudiantes, profesores,
+                RUTA_FACULTADES, RUTA_PROGRAMAS, RUTA_CURSOS,
+                RUTA_ESTUDIANTES, RUTA_MATRICULAS, RUTA_PROFESORES
+            )
             pausar()
         elif opcion == 0:
             guardar_facultades(facultades, RUTA_FACULTADES)
