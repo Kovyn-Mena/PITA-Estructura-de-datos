@@ -29,13 +29,61 @@ def crear_facultad(facultades):
     print("Facultad creada correctamente.")
 
 
-def listar_facultades(facultades):
-    print("\n--- Facultades registradas ---")
-    if not facultades:
-        print("(no hay facultades registradas)")
+def _paginar_listado(titulo, items, formatear_item, tam_pagina=25):
+    if not items:
+        print(f"\n--- {titulo} ---")
+        print(f"(no hay registros)")
         return
-    for f in facultades:
-        print(f)
+
+    total = len(items)
+    if total <= tam_pagina:
+        print(f"\n--- {titulo} (Total: {total}) ---")
+        for it in items:
+            print(formatear_item(it))
+        return
+
+    pagina = 1
+    total_paginas = (total + tam_pagina - 1) // tam_pagina
+    while True:
+        ini = (pagina - 1) * tam_pagina
+        fin = min(ini + tam_pagina, total)
+        print(f"\n--- {titulo} (Página {pagina} de {total_paginas} | Mostrando {ini + 1}-{fin} de {total:,}) ---")
+        for it in items[ini:fin]:
+            print(formatear_item(it))
+        print("-" * 65)
+        print("[S] Siguiente | [A] Anterior | [I] Ir a página | [0/Enter] Salir: ", end="")
+        try:
+            op = input().strip().lower()
+        except EOFError:
+            break
+        if op in ("0", "q", "exit", ""):
+            break
+        elif op == "s":
+            if pagina < total_paginas:
+                pagina += 1
+            else:
+                print("Ya estás en la última página.")
+        elif op == "a":
+            if pagina > 1:
+                pagina -= 1
+            else:
+                print("Ya estás en la primera página.")
+        elif op == "i":
+            print(f"Ingrese número de página (1 a {total_paginas}): ", end="")
+            try:
+                num = int(input().strip())
+                if 1 <= num <= total_paginas:
+                    pagina = num
+                else:
+                    print(f"Número de página fuera de rango (1 a {total_paginas}).")
+            except ValueError:
+                print("Entrada inválida.")
+        else:
+            print("Opción no reconocida.")
+
+
+def listar_facultades(facultades):
+    _paginar_listado("Facultades registradas", facultades, lambda f: str(f))
 
 
 def buscar_facultad(facultades, codigo):
@@ -107,13 +155,11 @@ def crear_programa(programas, facultades):
 
 
 def listar_programas(programas):
-    print("\n--- Programas academicos registrados ---")
-    if not programas:
-        print("(no hay programas registrados)")
-        return
-    for p in programas:
-        estado = "Activo" if p.activo else "Inactivo"
-        print(f"{p.codigo} | {p.nombre} | {p.nivel} | Facultad: {p.codigo_facultad} | {estado}")
+    _paginar_listado(
+        "Programas academicos registrados",
+        programas,
+        lambda p: f"{p.codigo} | {p.nombre} | {p.nivel} | Facultad: {p.codigo_facultad} | {'Activo' if p.activo else 'Inactivo'}"
+    )
 
 
 def buscar_programa(programas, codigo):
@@ -191,18 +237,13 @@ def crear_curso(cursos, programas):
 
 
 def listar_cursos(cursos):
-    print("\n--- Cursos registrados ---")
-    if not cursos:
-        print("(no hay cursos registrados)")
-        return
-    limite = min(50, len(cursos))
-    for c in cursos[:limite]:
-        estado = "Activo" if c.activo else "Inactivo"
-        profesor = c.codigo_profesor if c.codigo_profesor else "(sin asignar)"
-        print(f"{c.codigo} | {c.nombre} | {c.creditos} creditos | "
-              f"Programa: {c.codigo_programa} | Profesor: {profesor} | {estado}")
-    if len(cursos) > 50:
-        print(f"\n[Nota: Se muestran los primeros 50 de {len(cursos):,} cursos para optimizar memoria de consola. Use 'Consultar horario de curso' para ver detalles especificos].")
+    _paginar_listado(
+        "Cursos registrados",
+        cursos,
+        lambda c: f"{c.codigo} | {c.nombre} | {c.creditos} creditos | "
+                  f"Programa: {c.codigo_programa} | Profesor: {c.codigo_profesor if c.codigo_profesor else '(sin asignar)'} | "
+                  f"{'Activo' if c.activo else 'Inactivo'}"
+    )
 
 
 def buscar_curso(cursos, codigo):
@@ -274,17 +315,12 @@ def crear_estudiante(estudiantes, programas):
 
 
 def listar_estudiantes(estudiantes):
-    print("\n--- Estudiantes registrados ---")
-    if not estudiantes:
-        print("(no hay estudiantes registrados)")
-        return
-    limite = min(50, len(estudiantes))
-    for e in estudiantes[:limite]:
-        estado_activo = "Activo" if e.activo else "Inactivo"
-        print(f"{e.identificacion} | {e.nombre_completo} | Programa: {e.codigo_programa} | "
-              f"{e.estado} | {estado_activo} | Cursos matriculados: {len(e.matriculas)}")
-    if len(estudiantes) > 50:
-        print(f"\n[Nota: Se muestran los primeros 50 de {len(estudiantes):,} estudiantes para optimizar memoria de consola. Use 'Ver ficha' para consultar un estudiante especifico].")
+    _paginar_listado(
+        "Estudiantes registrados",
+        estudiantes,
+        lambda e: f"{e.identificacion} | {e.nombre_completo} | Programa: {e.codigo_programa} | "
+                  f"{e.estado} | {'Activo' if e.activo else 'Inactivo'} | Cursos matriculados: {len(e.matriculas)}"
+    )
 
 
 def buscar_estudiante(estudiantes, identificacion):
@@ -477,18 +513,13 @@ def crear_profesor(profesores, programas):
 
 
 def listar_profesores(profesores):
-    print("\n--- Profesores registrados ---")
-    if not profesores:
-        print("(no hay profesores registrados)")
-        return
-    limite = min(50, len(profesores))
-    for p in profesores[:limite]:
-        estado = "Activo" if p.activo else "Inactivo"
-        posg = f" | Posg: {p.posgrado}" if getattr(p, "posgrado", "") else ""
-        print(f"{p.identificacion} | {p.nombre_completo} | {p.tipo_vinculacion} | "
-              f"{p.dedicacion} | {p.categoria_escalafon}{posg} | Programa: {p.codigo_programa} | {estado}")
-    if len(profesores) > 50:
-        print(f"\n[Nota: Se muestran los primeros 50 de {len(profesores):,} profesores para optimizar memoria de consola. Use 'Ver desglose individual de nomina' para consultar un docente especifico].")
+    _paginar_listado(
+        "Profesores registrados",
+        profesores,
+        lambda p: f"{p.identificacion} | {p.nombre_completo} | {p.tipo_vinculacion} | "
+                  f"{p.dedicacion} | {p.categoria_escalafon}{(' | Posg: ' + p.posgrado) if getattr(p, 'posgrado', '') else ''} | "
+                  f"Programa: {p.codigo_programa} | {'Activo' if p.activo else 'Inactivo'}"
+    )
 
 
 def buscar_profesor(profesores, identificacion):
@@ -593,16 +624,13 @@ def crear_administrativo(admins, facultades):
 
 
 def listar_administrativos(admins):
-    print("\n--- Administrativos registrados ---")
-    if not admins:
-        print("(no hay administrativos registrados)")
-        return
-    for a in admins:
-        estado = "Activo" if a.activo else "Inactivo"
-        facultad = a.codigo_facultad if a.codigo_facultad else "(nivel central)"
-        print(f"{a.identificacion} | {a.nombre_completo} | {a.cargo} | {a.categoria} | "
-              f"{a.tipo_contratacion} | Facultad: {facultad} | "
-              f"Salario base: ${a.salario_base:,.2f} | {estado}")
+    _paginar_listado(
+        "Administrativos registrados",
+        admins,
+        lambda a: f"{a.identificacion} | {a.nombre_completo} | {a.cargo} | {a.categoria} | "
+                  f"{a.tipo_contratacion} | Facultad: {a.codigo_facultad if a.codigo_facultad else '(nivel central)'} | "
+                  f"Salario base: ${a.salario_base:,.2f} | {'Activo' if a.activo else 'Inactivo'}"
+    )
 
 
 def buscar_administrativo(admins, identificacion):

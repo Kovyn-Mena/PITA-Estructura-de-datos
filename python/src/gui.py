@@ -188,6 +188,9 @@ class PitaApp(tk.Tk):
         self.search_vars = {}        # id_seccion -> StringVar
         self.info_labels = {}        # id_seccion -> Label de estado
         self.refrescos_seccion = {}  # id_seccion -> funcion de refresco
+        self.paginacion = {}         # id_seccion -> {"pagina": 1, "tamanio": 50, "total_items": 0, "total_paginas": 1}
+        self.pag_labels = {}         # id_seccion -> Label widget
+        self.pag_btns = {}           # id_seccion -> dict de widgets de navegación
 
         # Filtros de navegación jerárquica
         self.filtro_facultad_programas = None
@@ -474,8 +477,8 @@ class PitaApp(tk.Tk):
 
     # ---------------- Helper de Layout de Pestañas ----------------
 
-    def _crear_shell_tab(self, sid, nombre_seccion, columnas, con_busqueda=True):
-        """Crea el contenedor base con buscador y área de botones de 2 filas si es necesario."""
+    def _crear_shell_tab(self, sid, nombre_seccion, columnas, con_busqueda=True, con_paginacion=True):
+        """Crea el contenedor base con buscador, barra de paginación y área de botones."""
         outer = self.secciones[sid]
 
         top_header = tk.Frame(outer, bg=C["bg"])
@@ -517,14 +520,133 @@ class PitaApp(tk.Tk):
         tree.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
 
-        info_lbl = tk.Label(card, text="", font=("Segoe UI", 8, "italic"), bg=C["card"], fg=C["muted"], anchor="w")
-        info_lbl.pack(fill="x", padx=12, pady=(2, 2))
+        # Inicializar configuración de paginación para esta sección
+        self.paginacion[sid] = {"pagina": 1, "tamanio": 50, "total_items": 0, "total_paginas": 1}
+
+        # Barra combinada de información y controles de paginación
+        pag_bar = tk.Frame(card, bg=C["card"])
+        pag_bar.pack(fill="x", padx=10, pady=(2, 2))
+
+        info_lbl = tk.Label(pag_bar, text="", font=("Segoe UI", 8, "italic"), bg=C["card"], fg=C["muted"], anchor="w")
+        info_lbl.pack(side="left", fill="x", expand=True)
         self.info_labels[sid] = info_lbl
+
+        if con_paginacion:
+            pag_controls = tk.Frame(pag_bar, bg=C["card"])
+            pag_controls.pack(side="right")
+
+            tk.Label(pag_controls, text="Por pág:", font=("Segoe UI", 8), bg=C["card"], fg=C["muted"]).pack(side="left", padx=(4, 2))
+
+            tam_var = tk.StringVar(value="50")
+            tam_combo = ttk.Combobox(pag_controls, textvariable=tam_var, values=["25", "50", "100", "250", "500"],
+                                     width=4, state="readonly")
+            tam_combo.pack(side="left", padx=(0, 6))
+            tam_combo.bind("<<ComboboxSelected>>", lambda e, s=sid, v=tam_var: self._cambiar_tamanio_pagina(s, v.get()))
+
+            btn_first = tk.Button(pag_controls, text="|<<", command=lambda s=sid: self._ir_pagina_extrema(s, fin=False),
+                                  font=("Segoe UI", 8, "bold"), bg="#e5e7eb", fg="#374151", relief="flat", bd=0, padx=5, pady=1, cursor="hand2")
+            btn_first.pack(side="left", padx=1)
+
+            btn_prev = tk.Button(pag_controls, text="< Ant", command=lambda s=sid: self._cambiar_pagina(s, -1),
+                                 font=("Segoe UI", 8), bg="#e5e7eb", fg="#374151", relief="flat", bd=0, padx=6, pady=1, cursor="hand2")
+            btn_prev.pack(side="left", padx=1)
+
+            lbl_pag = tk.Label(pag_controls, text="Pág 1 de 1", font=("Segoe UI", 8, "bold"), bg=C["card"], fg=C["primary"], padx=4)
+            lbl_pag.pack(side="left")
+            self.pag_labels[sid] = lbl_pag
+
+            btn_next = tk.Button(pag_controls, text="Sig >", command=lambda s=sid: self._cambiar_pagina(s, 1),
+                                 font=("Segoe UI", 8), bg="#e5e7eb", fg="#374151", relief="flat", bd=0, padx=6, pady=1, cursor="hand2")
+            btn_next.pack(side="left", padx=1)
+
+            btn_last = tk.Button(pag_controls, text=">>|", command=lambda s=sid: self._ir_pagina_extrema(s, fin=True),
+                                 font=("Segoe UI", 8, "bold"), bg="#e5e7eb", fg="#374151", relief="flat", bd=0, padx=5, pady=1, cursor="hand2")
+            btn_last.pack(side="left", padx=1)
+
+            self.pag_btns[sid] = {
+                "first": btn_first,
+                "prev": btn_prev,
+                "next": btn_next,
+                "last": btn_last,
+                "tam_var": tam_var
+            }
 
         btn_frame = tk.Frame(card, bg=C["card"])
         btn_frame.pack(fill="x", padx=10, pady=(2, 8))
 
         return tree, btn_frame
+
+    # ---------------- Métodos de Navegación Paginada ----------------
+
+    def _reset_pagina(self, sid):
+        if sid in self.paginacion:
+            self.paginacion[sid]["pagina"] = 1
+
+    def _cambiar_tamanio_pagina(self, sid, valor_str):
+        try:
+            tam = int(valor_str)
+            if tam > 0 and sid in self.paginacion:
+                self.paginacion[sid]["tamanio"] = tam
+                self.paginacion[sid]["pagina"] = 1
+                if sid in self.refrescos_seccion:
+                    self.refrescos_seccion[sid]()
+        except ValueError:
+            pass
+
+    def _cambiar_pagina(self, sid, delta):
+        if sid not in self.paginacion:
+            return
+        pag_actual = self.paginacion[sid]["pagina"]
+        total_pags = self.paginacion[sid].get("total_paginas", 1)
+        nueva = pag_actual + delta
+        if 1 <= nueva <= total_pags:
+            self.paginacion[sid]["pagina"] = nueva
+            if sid in self.refrescos_seccion:
+                self.refrescos_seccion[sid]()
+
+    def _ir_pagina_extrema(self, sid, fin=False):
+        if sid not in self.paginacion:
+            return
+        total_pags = self.paginacion[sid].get("total_paginas", 1)
+        self.paginacion[sid]["pagina"] = total_pags if fin else 1
+        if sid in self.refrescos_seccion:
+            self.refrescos_seccion[sid]()
+
+    def _obtener_datos_paginados(self, sid, items):
+        """Calcula el slice para la página actual y actualiza los indicadores de paginación."""
+        total_items = len(items)
+        if sid not in self.paginacion:
+            return items, total_items, 0, total_items
+
+        cfg = self.paginacion[sid]
+        tamanio = cfg.get("tamanio", 50)
+        total_paginas = max(1, (total_items + tamanio - 1) // tamanio)
+        cfg["total_items"] = total_items
+        cfg["total_paginas"] = total_paginas
+
+        if cfg["pagina"] > total_paginas:
+            cfg["pagina"] = total_paginas
+        if cfg["pagina"] < 1:
+            cfg["pagina"] = 1
+
+        pag = cfg["pagina"]
+        start_idx = (pag - 1) * tamanio
+        end_idx = min(start_idx + tamanio, total_items)
+        slice_items = items[start_idx:end_idx]
+
+        if sid in self.pag_labels:
+            self.pag_labels[sid].config(text=f"Pág {pag} de {total_paginas}")
+
+        if sid in self.pag_btns:
+            btns = self.pag_btns[sid]
+            state_prev = "normal" if pag > 1 else "disabled"
+            state_next = "normal" if pag < total_paginas else "disabled"
+            for b in (btns["first"], btns["prev"]):
+                b.config(state=state_prev, cursor="hand2" if state_prev == "normal" else "arrow")
+            for b in (btns["next"], btns["last"]):
+                b.config(state=state_next, cursor="hand2" if state_next == "normal" else "arrow")
+
+        return slice_items, total_items, start_idx, end_idx
 
     def _fila_activo(self, activo):
         return "Activo" if activo else "Inactivo"
@@ -561,9 +683,10 @@ class PitaApp(tk.Tk):
         self._btn(btns, "Ver programas",     self._ir_a_programas_filtrados)
 
         if "facultades" in self.search_vars:
-            self.search_vars["facultades"].trace_add("write", lambda *_: self._refrescar_facultades())
+            self.search_vars["facultades"].trace_add("write", lambda *_: (self._reset_pagina("facultades"), self._refrescar_facultades()))
 
         self.tree_facultades.bind("<Double-1>", self._doble_click_facultad)
+        self.refrescos_seccion["facultades"] = self._refrescar_facultades
         self._refrescar_facultades()
 
     def _refrescar_facultades(self):
@@ -572,11 +695,17 @@ class PitaApp(tk.Tk):
         items = [f for f in self.facultades if not query or (
             query in f.codigo.lower() or query in f.nombre.lower() or query in f.decano.lower()
         )]
-        for f in items:
+        visibles, total_items, start_i, end_i = self._obtener_datos_paginados("facultades", items)
+        for f in visibles:
             self.tree_facultades.insert("", "end", iid=f.codigo,
                 values=(f.codigo, f.nombre, f.decano, self._fila_activo(f.activo)))
         if "facultades" in self.info_labels:
-            self.info_labels["facultades"].config(text=f"Total: {len(items)} de {len(self.facultades)} facultades registradas.")
+            if total_items > 0:
+                self.info_labels["facultades"].config(
+                    text=f"Mostrando {start_i + 1} - {end_i} de {total_items} facultades (Total: {len(self.facultades)})."
+                )
+            else:
+                self.info_labels["facultades"].config(text="No se encontraron facultades.")
 
     def _facultad_seleccionada(self):
         sel = self.tree_facultades.selection()
@@ -653,9 +782,10 @@ class PitaApp(tk.Tk):
         self._btn(btns, "Volver a Facultades", self._volver_a_facultades,        estilo="nav", lado="right")
 
         if "programas" in self.search_vars:
-            self.search_vars["programas"].trace_add("write", lambda *_: self._refrescar_programas())
+            self.search_vars["programas"].trace_add("write", lambda *_: (self._reset_pagina("programas"), self._refrescar_programas()))
 
         self.tree_programas.bind("<Double-1>", self._doble_click_programa)
+        self.refrescos_seccion["programas"] = self._refrescar_programas
         self._refrescar_programas()
 
     def _refrescar_programas(self):
@@ -668,11 +798,17 @@ class PitaApp(tk.Tk):
             if query and not (query in p.codigo.lower() or query in p.nombre.lower() or query in p.codigo_facultad.lower()):
                 continue
             items.append(p)
-        for p in items:
+        visibles, total_items, start_i, end_i = self._obtener_datos_paginados("programas", items)
+        for p in visibles:
             self.tree_programas.insert("", "end", iid=p.codigo,
                 values=(p.codigo, p.nombre, p.nivel, p.codigo_facultad, self._fila_activo(p.activo)))
         if "programas" in self.info_labels:
-            self.info_labels["programas"].config(text=f"Total: {len(items)} de {len(self.programas)} programas.")
+            if total_items > 0:
+                self.info_labels["programas"].config(
+                    text=f"Mostrando {start_i + 1} - {end_i} de {total_items} programas (Total: {len(self.programas)})."
+                )
+            else:
+                self.info_labels["programas"].config(text="No se encontraron programas.")
         self._actualizar_titulo_programas()
 
     # ---------------- NAVEGACIÓN JERÁRQUICA ----------------
@@ -695,12 +831,14 @@ class PitaApp(tk.Tk):
             return
         self.filtro_facultad_programas = f.codigo
         self.filtro_programa_cursos = None
+        self._reset_pagina("programas")
         self._refrescar_programas()
         self._mostrar_seccion("programas")
         self._set_status(f"Mostrando programas de la facultad: {f.nombre} ({f.codigo}).")
 
     def _mostrar_todos_programas(self):
         self.filtro_facultad_programas = None
+        self._reset_pagina("programas")
         self._refrescar_programas()
         self._mostrar_seccion("programas")
         self._set_status("Mostrando todos los programas.")
@@ -710,12 +848,14 @@ class PitaApp(tk.Tk):
         if not p:
             return
         self.filtro_programa_cursos = p.codigo
+        self._reset_pagina("cursos")
         self._refrescar_cursos()
         self._mostrar_seccion("cursos")
         self._set_status(f"Mostrando cursos del programa: {p.nombre} ({p.codigo}).")
 
     def _mostrar_todos_cursos(self):
         self.filtro_programa_cursos = None
+        self._reset_pagina("cursos")
         self._refrescar_cursos()
         self._mostrar_seccion("cursos")
         self._set_status("Mostrando todos los cursos.")
@@ -726,6 +866,7 @@ class PitaApp(tk.Tk):
             return
         self.filtro_programa_estudiantes = p.codigo
         self.filtro_curso_estudiantes = None
+        self._reset_pagina("estudiantes")
         self._refrescar_estudiantes()
         self._mostrar_seccion("estudiantes")
         self._set_status(f"Mostrando estudiantes del programa: {p.nombre} ({p.codigo}).")
@@ -736,6 +877,7 @@ class PitaApp(tk.Tk):
             return
         self.filtro_curso_estudiantes = c.codigo
         self.filtro_programa_estudiantes = None
+        self._reset_pagina("estudiantes")
         self._refrescar_estudiantes()
         self._mostrar_seccion("estudiantes")
         self._set_status(f"Mostrando estudiantes matriculados en: {c.nombre} ({c.codigo}).")
@@ -743,6 +885,7 @@ class PitaApp(tk.Tk):
     def _mostrar_todos_estudiantes(self):
         self.filtro_programa_estudiantes = None
         self.filtro_curso_estudiantes = None
+        self._reset_pagina("estudiantes")
         self._refrescar_estudiantes()
         self._mostrar_seccion("estudiantes")
         self._set_status("Mostrando todos los estudiantes.")
@@ -887,9 +1030,10 @@ class PitaApp(tk.Tk):
         self._btn(fila2, "Volver a Programas", self._volver_a_programas,       estilo="nav", lado="right")
 
         if "cursos" in self.search_vars:
-            self.search_vars["cursos"].trace_add("write", lambda *_: self._refrescar_cursos())
+            self.search_vars["cursos"].trace_add("write", lambda *_: (self._reset_pagina("cursos"), self._refrescar_cursos()))
 
         self.tree_cursos.bind("<Double-1>", self._doble_click_curso)
+        self.refrescos_seccion["cursos"] = self._refrescar_cursos
         self._refrescar_cursos()
 
     def _refrescar_cursos(self):
@@ -909,7 +1053,7 @@ class PitaApp(tk.Tk):
                     continue
             items.append(c)
 
-        visibles = items[:300]
+        visibles, total_items, start_i, end_i = self._obtener_datos_paginados("cursos", items)
         for c in visibles:
             prof = c.codigo_profesor if c.codigo_profesor else "(sin asignar)"
             dia = getattr(c, "dia", "")
@@ -926,10 +1070,12 @@ class PitaApp(tk.Tk):
                 values=(c.codigo, c.nombre, c.creditos, c.codigo_programa, prof, horario_str, salon_str, self._fila_activo(c.activo)))
 
         if "cursos" in self.info_labels:
-            if len(items) > 300:
-                self.info_labels["cursos"].config(text=f"Mostrando primeros 300 de {len(items):,} cursos (Usa el buscador para filtrar en tiempo real).")
+            if total_items > 0:
+                self.info_labels["cursos"].config(
+                    text=f"Mostrando {start_i + 1} - {end_i} de {total_items:,} cursos (Total base: {len(self.cursos):,})."
+                )
             else:
-                self.info_labels["cursos"].config(text=f"Total: {len(items):,} de {len(self.cursos):,} cursos.")
+                self.info_labels["cursos"].config(text="No se encontraron cursos.")
         self._actualizar_titulo_cursos()
 
     def _curso_seleccionado(self):
@@ -1052,9 +1198,10 @@ class PitaApp(tk.Tk):
         self._btn(fila2, "Eliminar",           self._estudiante_eliminar,        estilo="danger")
 
         if "estudiantes" in self.search_vars:
-            self.search_vars["estudiantes"].trace_add("write", lambda *_: self._refrescar_estudiantes())
+            self.search_vars["estudiantes"].trace_add("write", lambda *_: (self._reset_pagina("estudiantes"), self._refrescar_estudiantes()))
 
         self.tree_estudiantes.bind("<Double-1>", self._doble_click_estudiante)
+        self.refrescos_seccion["estudiantes"] = self._refrescar_estudiantes
         self._refrescar_estudiantes()
 
     def _refrescar_estudiantes(self):
@@ -1073,7 +1220,7 @@ class PitaApp(tk.Tk):
                     continue
             items.append(e)
 
-        visibles = items[:300]
+        visibles, total_items, start_i, end_i = self._obtener_datos_paginados("estudiantes", items)
         self.tree_estudiantes.tag_configure("riesgo", foreground=C["danger"])
         for e in visibles:
             promedio = e.calcular_promedio()
@@ -1086,11 +1233,12 @@ class PitaApp(tk.Tk):
                         f"{promedio:.2f}", ebra), tags=tags)
 
         if "estudiantes" in self.info_labels:
-            if len(items) > 300:
+            if total_items > 0:
                 self.info_labels["estudiantes"].config(
-                    text=f"Mostrando primeros 300 de {len(items):,} estudiantes (Escribe en el buscador para filtrar en tiempo real).")
+                    text=f"Mostrando {start_i + 1} - {end_i} de {total_items:,} estudiantes (Total base: {len(self.estudiantes):,})."
+                )
             else:
-                self.info_labels["estudiantes"].config(text=f"Total: {len(items):,} de {len(self.estudiantes):,} estudiantes.")
+                self.info_labels["estudiantes"].config(text="No se encontraron estudiantes.")
         self._actualizar_titulo_estudiantes()
 
     def _estudiante_seleccionado(self):
@@ -1230,8 +1378,9 @@ class PitaApp(tk.Tk):
         self._btn(btns, "Eliminar",           self._profesor_eliminar, estilo="danger")
 
         if "profesores" in self.search_vars:
-            self.search_vars["profesores"].trace_add("write", lambda *_: self._refrescar_profesores())
+            self.search_vars["profesores"].trace_add("write", lambda *_: (self._reset_pagina("profesores"), self._refrescar_profesores()))
 
+        self.refrescos_seccion["profesores"] = self._refrescar_profesores
         self._refrescar_profesores()
 
     def _refrescar_profesores(self):
@@ -1247,18 +1396,19 @@ class PitaApp(tk.Tk):
                     continue
             items.append(p)
 
-        visibles = items[:300]
+        visibles, total_items, start_i, end_i = self._obtener_datos_paginados("profesores", items)
         for p in visibles:
             self.tree_profesores.insert("", "end", iid=p.identificacion,
                 values=(p.identificacion, p.nombre_completo, p.tipo_vinculacion, p.dedicacion,
                         p.categoria_escalafon or "—", p.codigo_programa, self._fila_activo(p.activo)))
 
         if "profesores" in self.info_labels:
-            if len(items) > 300:
+            if total_items > 0:
                 self.info_labels["profesores"].config(
-                    text=f"Mostrando primeros 300 de {len(items):,} profesores (Usa el buscador para filtrar en tiempo real).")
+                    text=f"Mostrando {start_i + 1} - {end_i} de {total_items:,} profesores (Total base: {len(self.profesores):,})."
+                )
             else:
-                self.info_labels["profesores"].config(text=f"Total: {len(items):,} de {len(self.profesores):,} profesores.")
+                self.info_labels["profesores"].config(text="No se encontraron profesores.")
 
     def _profesor_seleccionado(self):
         sel = self.tree_profesores.selection()
@@ -1410,8 +1560,9 @@ class PitaApp(tk.Tk):
         self._btn(btns, "Eliminar",           self._admin_eliminar, estilo="danger")
 
         if "administrativos" in self.search_vars:
-            self.search_vars["administrativos"].trace_add("write", lambda *_: self._refrescar_administrativos())
+            self.search_vars["administrativos"].trace_add("write", lambda *_: (self._reset_pagina("administrativos"), self._refrescar_administrativos()))
 
+        self.refrescos_seccion["administrativos"] = self._refrescar_administrativos
         self._refrescar_administrativos()
 
     def _admin_ver_salario(self):
@@ -1431,14 +1582,20 @@ class PitaApp(tk.Tk):
                     continue
             items.append(a)
 
-        for a in items:
+        visibles, total_items, start_i, end_i = self._obtener_datos_paginados("administrativos", items)
+        for a in visibles:
             facultad = a.codigo_facultad if a.codigo_facultad else "(nivel central)"
             self.tree_admins.insert("", "end", iid=a.identificacion,
                 values=(a.identificacion, a.nombre_completo, a.cargo, a.tipo_contratacion,
                         facultad, f"${a.salario_base:,.0f}", self._fila_activo(a.activo)))
 
         if "administrativos" in self.info_labels:
-            self.info_labels["administrativos"].config(text=f"Total: {len(items)} de {len(self.administrativos)} administrativos.")
+            if total_items > 0:
+                self.info_labels["administrativos"].config(
+                    text=f"Mostrando {start_i + 1} - {end_i} de {total_items} administrativos (Total: {len(self.administrativos)})."
+                )
+            else:
+                self.info_labels["administrativos"].config(text="No se encontraron administrativos.")
 
     def _admin_seleccionado(self):
         sel = self.tree_admins.selection()
@@ -1546,7 +1703,7 @@ class PitaApp(tk.Tk):
                  font=("Segoe UI", 8, "italic"), bg=C["card"], fg=C["muted"]).pack(side="left", padx=8)
 
         if "nomina" in self.search_vars:
-            self.search_vars["nomina"].trace_add("write", lambda *_: self._refrescar_nomina())
+            self.search_vars["nomina"].trace_add("write", lambda *_: (self._reset_pagina("nomina"), self._refrescar_nomina()))
 
         self.tree_nomina.bind("<Double-1>", lambda e: self._nomina_ver_seleccionado())
         self.refrescos_seccion["nomina"] = self._refrescar_nomina
@@ -1563,7 +1720,7 @@ class PitaApp(tk.Tk):
                     continue
             items.append(p)
 
-        visibles = items[:300]
+        visibles, total_items, start_i, end_i = self._obtener_datos_paginados("nomina", items)
         for p in visibles:
             if liquidacion_disponible(p):
                 dev = calcular_total_devengado(p)
@@ -1585,11 +1742,12 @@ class PitaApp(tk.Tk):
                         p.dedicacion, p.codigo_programa, dev_str, neto_str))
 
         if "nomina" in self.info_labels:
-            if len(items) > 300:
+            if total_items > 0:
                 self.info_labels["nomina"].config(
-                    text=f"Mostrando primeros 300 de {len(items):,} docentes (Usa el buscador para filtrar en tiempo real).")
+                    text=f"Mostrando {start_i + 1} - {end_i} de {total_items:,} docentes (Total base: {len(self.profesores):,})."
+                )
             else:
-                self.info_labels["nomina"].config(text=f"Total: {len(items):,} de {len(self.profesores):,} docentes.")
+                self.info_labels["nomina"].config(text="No se encontraron docentes.")
 
     def _nomina_ver_seleccionado(self):
         sel = self.tree_nomina.selection()

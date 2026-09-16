@@ -38,16 +38,65 @@ void crearFacultad(vector<Facultad>& facultades) {
     cout << "Facultad creada correctamente.\n";
 }
 
-void listarFacultades(const vector<Facultad>& facultades) {
-    cout << "\n--- Facultades registradas ---\n";
-    if (facultades.empty()) {
-        cout << "(no hay facultades registradas)\n";
+template <typename T, typename Func>
+void paginarListado(const string& titulo, const vector<T>& items, Func formatearItem, size_t tamPagina = 25) {
+    if (items.empty()) {
+        cout << "\n--- " << titulo << " ---\n(no hay registros)\n";
         return;
     }
-    for (const auto& f : facultades) {
+    size_t total = items.size();
+    if (total <= tamPagina) {
+        cout << "\n--- " << titulo << " (Total: " << total << ") ---\n";
+        for (const auto& it : items) {
+            formatearItem(it);
+        }
+        return;
+    }
+
+    size_t pagina = 1;
+    size_t totalPaginas = (total + tamPagina - 1) / tamPagina;
+    while (true) {
+        size_t ini = (pagina - 1) * tamPagina;
+        size_t fin = min(ini + tamPagina, total);
+        cout << "\n--- " << titulo << " (Pagina " << pagina << " de " << totalPaginas
+             << " | Mostrando " << (ini + 1) << "-" << fin << " de " << total << ") ---\n";
+        for (size_t i = ini; i < fin; ++i) {
+            formatearItem(items[i]);
+        }
+        cout << "-----------------------------------------------------------------\n";
+        cout << "[S] Siguiente | [A] Anterior | [I] Ir a pagina | [0/Enter] Salir: ";
+        string op;
+        getline(cin, op);
+        if (op.empty() || op == "0" || op == "q" || op == "Q" || op == "exit") {
+            break;
+        } else if (op == "s" || op == "S") {
+            if (pagina < totalPaginas) pagina++;
+            else cout << "Ya estas en la ultima pagina.\n";
+        } else if (op == "a" || op == "A") {
+            if (pagina > 1) pagina--;
+            else cout << "Ya estas en la primera pagina.\n";
+        } else if (op == "i" || op == "I") {
+            cout << "Ingrese numero de pagina (1 a " << totalPaginas << "): ";
+            string numStr;
+            getline(cin, numStr);
+            try {
+                size_t num = stoul(numStr);
+                if (num >= 1 && num <= totalPaginas) pagina = num;
+                else cout << "Numero de pagina fuera de rango (1 a " << totalPaginas << ").\n";
+            } catch (...) {
+                cout << "Entrada invalida.\n";
+            }
+        } else {
+            cout << "Opcion no reconocida.\n";
+        }
+    }
+}
+
+void listarFacultades(const vector<Facultad>& facultades) {
+    paginarListado("Facultades registradas", facultades, [](const Facultad& f) {
         cout << f.codigo << " | " << f.nombre << " | Decano: " << f.decano
              << " | " << (f.activo ? "Activa" : "Inactiva") << "\n";
-    }
+    });
 }
 
 Facultad* buscarFacultad(vector<Facultad>& facultades, const string& codigo) {
@@ -126,16 +175,11 @@ void crearPrograma(vector<Programa>& programas, vector<Facultad>& facultades) {
 }
 
 void listarProgramas(const vector<Programa>& programas) {
-    cout << "\n--- Programas academicos registrados ---\n";
-    if (programas.empty()) {
-        cout << "(no hay programas registrados)\n";
-        return;
-    }
-    for (const auto& p : programas) {
+    paginarListado("Programas academicos registrados", programas, [](const Programa& p) {
         cout << p.codigo << " | " << p.nombre << " | " << p.nivel
              << " | Facultad: " << p.codigoFacultad
              << " | " << (p.activo ? "Activo" : "Inactivo") << "\n";
-    }
+    });
 }
 
 Programa* buscarPrograma(vector<Programa>& programas, const string& codigo) {
@@ -216,23 +260,12 @@ void crearCurso(vector<Curso>& cursos, vector<Programa>& programas) {
 }
 
 void listarCursos(const vector<Curso>& cursos) {
-    cout << "\n--- Cursos registrados ---\n";
-    if (cursos.empty()) {
-        cout << "(no hay cursos registrados)\n";
-        return;
-    }
-    size_t limite = min(size_t(50), cursos.size());
-    for (size_t i = 0; i < limite; ++i) {
-        const auto& c = cursos[i];
+    paginarListado("Cursos registrados", cursos, [](const Curso& c) {
         cout << c.codigo << " | " << c.nombre << " | " << c.creditos << " creditos"
              << " | Programa: " << c.codigoPrograma
              << " | Profesor: " << (c.codigoProfesor.empty() ? "(sin asignar)" : c.codigoProfesor)
              << " | " << (c.activo ? "Activo" : "Inactivo") << "\n";
-    }
-    if (cursos.size() > 50) {
-        cout << "\n[Nota: Se muestran los primeros 50 de " << cursos.size()
-             << " cursos para optimizar memoria de consola. Use 'Consultar horario de curso' para ver detalles especificos].\n";
-    }
+    });
 }
 
 Curso* buscarCurso(vector<Curso>& cursos, const string& codigo) {
@@ -307,24 +340,13 @@ void crearEstudiante(vector<Estudiante>& estudiantes, vector<Programa>& programa
 }
 
 void listarEstudiantes(const vector<Estudiante>& estudiantes) {
-    cout << "\n--- Estudiantes registrados ---\n";
-    if (estudiantes.empty()) {
-        cout << "(no hay estudiantes registrados)\n";
-        return;
-    }
-    size_t limite = min(size_t(50), estudiantes.size());
-    for (size_t i = 0; i < limite; ++i) {
-        const auto& e = estudiantes[i];
+    paginarListado("Estudiantes registrados", estudiantes, [](const Estudiante& e) {
         cout << e.identificacion << " | " << e.nombreCompleto
              << " | Programa: " << e.codigoPrograma
              << " | " << e.estado
              << " | " << (e.activo ? "Activo" : "Inactivo")
              << " | Cursos matriculados: " << e.matriculas.size() << "\n";
-    }
-    if (estudiantes.size() > 50) {
-        cout << "\n[Nota: Se muestran los primeros 50 de " << estudiantes.size()
-             << " estudiantes para optimizar memoria de consola. Use 'Ver ficha' para consultar un estudiante especifico].\n";
-    }
+    });
 }
 
 Estudiante* buscarEstudiante(vector<Estudiante>& estudiantes, const string& id) {
@@ -551,14 +573,7 @@ void crearProfesor(vector<Profesor>& profesores, vector<Programa>& programas) {
 }
 
 void listarProfesores(const vector<Profesor>& profesores) {
-    cout << "\n--- Profesores registrados ---\n";
-    if (profesores.empty()) {
-        cout << "(no hay profesores registrados)\n";
-        return;
-    }
-    size_t limite = min(size_t(50), profesores.size());
-    for (size_t i = 0; i < limite; ++i) {
-        const auto& p = profesores[i];
+    paginarListado("Profesores registrados", profesores, [](const Profesor& p) {
         cout << p.identificacion << " | " << p.nombreCompleto
              << " | Programa: " << p.codigoPrograma
              << " | " << p.tipoVinculacion << " (" << p.dedicacion << ")";
@@ -566,11 +581,7 @@ void listarProfesores(const vector<Profesor>& profesores) {
         if (!p.posgrado.empty()) cout << " | Posg: " << p.posgrado;
         if (p.adHonorem) cout << " | AD-HONOREM";
         cout << " | " << (p.activo ? "Activo" : "Inactivo") << "\n";
-    }
-    if (profesores.size() > 50) {
-        cout << "\n[Nota: Se muestran los primeros 50 de " << profesores.size()
-             << " profesores para optimizar memoria de consola. Use 'Ver desglose individual' para consultar un docente especifico].\n";
-    }
+    });
 }
 
 Profesor* buscarProfesor(vector<Profesor>& profesores, const string& id) {
@@ -703,19 +714,13 @@ void crearAdministrativo(vector<Administrativo>& admins, vector<Facultad>& facul
 }
 
 void listarAdministrativos(const vector<Administrativo>& admins) {
-    cout << "\n--- Administrativos registrados ---\n";
-    if (admins.empty()) {
-        cout << "(no hay administrativos registrados)\n";
-        return;
-    }
-    cout << fixed << setprecision(0);
-    for (const auto& a : admins) {
+    paginarListado("Administrativos registrados", admins, [](const Administrativo& a) {
         cout << a.identificacion << " | " << a.nombreCompleto << " | " << a.cargo
              << " | " << a.categoria << " | " << a.tipoContratacion
              << " | Facultad: " << (a.codigoFacultad.empty() ? "(nivel central)" : a.codigoFacultad)
-             << " | Salario base: $" << a.salarioBase << " COP"
+             << " | Salario base: $" << fixed << setprecision(0) << a.salarioBase << " COP"
              << " | " << (a.activo ? "Activo" : "Inactivo") << "\n";
-    }
+    });
 }
 
 Administrativo* buscarAdministrativo(vector<Administrativo>& admins, const string& id) {
