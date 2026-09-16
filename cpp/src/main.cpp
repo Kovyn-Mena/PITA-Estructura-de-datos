@@ -364,24 +364,30 @@ void mostrarEstadisticasUniversitarias(
 
 void consultarEstudianteFicha(vector<Estudiante>& estudiantes) {
     if (estudiantes.empty()) {
-        mensajeAlerta("No hay estudiantes cargados en el sistema.");
+        mensajeAlerta("No hay datos disponibles. Primero genere o cargue la universidad.");
         pausar();
         return;
     }
+    string idSugerido = estudiantes[0].identificacion;
     int opcion = -1;
     do {
         limpiarPantalla();
         tituloSeccion("CONSULTA DE FICHA DE ESTUDIANTE");
+        cout << "Sugerencia para probar:\n";
+        cout << "- ID de estudiante disponible: " << idSugerido << "\n";
+        separador();
         cout << "1. Buscar por identificacion\n";
-        cout << "2. Mostrar estudiante aleatorio\n";
-        cout << "3. Mostrar estudiante en riesgo ERRA\n";
-        cout << "4. Mostrar estudiante sin riesgo ERRA\n";
+        cout << "2. Usar estudiante de ejemplo\n";
+        cout << "3. Usar estudiante en riesgo\n";
+        cout << "4. Usar estudiante sin riesgo\n";
         cout << "5. Volver (o presione ENTER)\n";
         separador();
         opcion = leerOpcionInmediata("Opcion: ");
 
         if (opcion == 1) {
-            string id = leerPalabra("Ingrese identificacion del estudiante (o 'cancelar' para volver): ");
+            cout << "\nIngrese la identificacion del estudiante.\n";
+            cout << "Sugerencia: pruebe con " << idSugerido << ".\n";
+            string id = leerPalabra("Identificacion (o 'cancelar' para volver): ");
             if (!esCancelar(id) && !id.empty()) {
                 consultarEstudiante(estudiantes, id);
             }
@@ -389,7 +395,7 @@ void consultarEstudianteFicha(vector<Estudiante>& estudiantes) {
         } else if (opcion == 2) {
             int idx = rand() % estudiantes.size();
             string idEjemplo = estudiantes[idx].identificacion;
-            mensajeInfo("Mostrando ficha del estudiante aleatorio (ID: " + idEjemplo + "):");
+            mensajeInfo("Mostrando ficha del estudiante de ejemplo (ID: " + idEjemplo + "):");
             consultarEstudiante(estudiantes, idEjemplo);
             pausar();
         } else if (opcion == 3) {
@@ -481,24 +487,30 @@ static void listarCursosMuestra(const vector<Curso>& cursos, size_t maxCount = 1
 
 void consultarCursoFicha(const vector<Curso>& cursos) {
     if (cursos.empty()) {
-        mensajeAlerta("No hay cursos registrados en el sistema.");
+        mensajeAlerta("No hay datos disponibles. Primero genere o cargue la universidad.");
         pausar();
         return;
     }
+    string codSugerido = cursos[0].codigo;
     int opcion = -1;
     do {
         limpiarPantalla();
         tituloSeccion("CONSULTA DE CURSO / HORARIOS");
+        cout << "Sugerencia para probar:\n";
+        cout << "- Codigo de curso disponible: " << codSugerido << "\n";
+        separador();
         cout << "1. Buscar por codigo\n";
-        cout << "2. Mostrar curso aleatorio\n";
-        cout << "3. Mostrar curso con horario\n";
+        cout << "2. Usar curso de ejemplo\n";
+        cout << "3. Usar curso con horario\n";
         cout << "4. Listar cursos de ejemplo\n";
         cout << "5. Volver (o presione ENTER)\n";
         separador();
         opcion = leerOpcionInmediata("Opcion: ");
 
         if (opcion == 1) {
-            string codigo = leerPalabra("Ingrese codigo del curso (o 'cancelar' para volver): ");
+            cout << "\nIngrese el codigo del curso.\n";
+            cout << "Sugerencia: pruebe con " << codSugerido << ".\n";
+            string codigo = leerPalabra("Codigo (o 'cancelar' para volver): ");
             if (!esCancelar(codigo) && !codigo.empty()) {
                 bool encontrado = false;
                 for (const auto& c : cursos) {
@@ -515,7 +527,7 @@ void consultarCursoFicha(const vector<Curso>& cursos) {
             pausar();
         } else if (opcion == 2) {
             int idx = rand() % cursos.size();
-            mensajeInfo("Mostrando ficha de curso aleatorio (Codigo: " + cursos[idx].codigo + "):");
+            mensajeInfo("Mostrando ficha de curso de ejemplo (Codigo: " + cursos[idx].codigo + "):");
             mostrarFichaCursoDetallada(cursos[idx]);
             pausar();
         } else if (opcion == 3) {
@@ -547,30 +559,42 @@ void consultarCursoFicha(const vector<Curso>& cursos) {
 
 void consultarProfesorFicha(vector<Profesor>& profesores) {
     if (profesores.empty()) {
-        mensajeAlerta("No hay profesores cargados en el sistema.");
+        mensajeAlerta("No hay datos disponibles. Primero genere o cargue la universidad.");
         pausar();
         return;
     }
+    string idSugerido = profesores[0].identificacion;
     int opcion = -1;
     do {
         limpiarPantalla();
         tituloSeccion("CONSULTA DE FICHA Y LIQUIDACION DE PROFESOR");
+        cout << "Sugerencia para probar:\n";
+        cout << "- ID de profesor disponible: " << idSugerido << "\n";
+        separador();
         cout << "1. Buscar por identificacion\n";
-        cout << "2. Mostrar profesor de planta\n";
-        cout << "3. Mostrar profesor ocasional\n";
-        cout << "4. Mostrar profesor catedratico\n";
-        cout << "5. Mostrar profesor aleatorio\n";
+        cout << "2. Usar profesor de ejemplo\n";
+        cout << "3. Usar profesor de planta\n";
+        cout << "4. Usar profesor ocasional\n";
+        cout << "5. Usar profesor catedratico\n";
         cout << "6. Volver (o presione ENTER)\n";
         separador();
         opcion = leerOpcionInmediata("Opcion: ");
 
         if (opcion == 1) {
-            string id = leerPalabra("Ingrese identificacion del profesor (o 'cancelar' para volver): ");
+            cout << "\nIngrese la identificacion del profesor.\n";
+            cout << "Sugerencia: pruebe con " << idSugerido << ".\n";
+            string id = leerPalabra("Identificacion (o 'cancelar' para volver): ");
             if (!esCancelar(id) && !id.empty()) {
                 consultarProfesor(profesores, id);
             }
             pausar();
         } else if (opcion == 2) {
+            int idx = rand() % profesores.size();
+            string idEjemplo = profesores[idx].identificacion;
+            mensajeInfo("Mostrando ficha de profesor de ejemplo (ID: " + idEjemplo + "):");
+            consultarProfesor(profesores, idEjemplo);
+            pausar();
+        } else if (opcion == 3) {
             string idEjemplo = "";
             for (const auto& prof : profesores) {
                 if (prof.activo && prof.tipoVinculacion == "Planta") {
@@ -585,7 +609,7 @@ void consultarProfesorFicha(vector<Profesor>& profesores) {
                 mensajeAlerta("No se encontro ningun profesor de Planta en memoria.");
             }
             pausar();
-        } else if (opcion == 3) {
+        } else if (opcion == 4) {
             string idEjemplo = "";
             for (const auto& prof : profesores) {
                 if (prof.activo && prof.tipoVinculacion == "Ocasional") {
@@ -600,7 +624,7 @@ void consultarProfesorFicha(vector<Profesor>& profesores) {
                 mensajeAlerta("No se encontro ningun profesor Ocasional en memoria.");
             }
             pausar();
-        } else if (opcion == 4) {
+        } else if (opcion == 5) {
             string idEjemplo = "";
             for (const auto& prof : profesores) {
                 if (prof.activo && prof.tipoVinculacion == "Catedratico") {
@@ -614,12 +638,6 @@ void consultarProfesorFicha(vector<Profesor>& profesores) {
             } else {
                 mensajeAlerta("No se encontro ningun profesor Catedratico en memoria.");
             }
-            pausar();
-        } else if (opcion == 5) {
-            int idx = rand() % profesores.size();
-            string idEjemplo = profesores[idx].identificacion;
-            mensajeInfo("Mostrando ficha de profesor aleatorio (ID: " + idEjemplo + "):");
-            consultarProfesor(profesores, idEjemplo);
             pausar();
         } else if (opcion == 6 || opcion == 0) {
             break;
@@ -765,19 +783,35 @@ int main() {
                 pausar();
                 break;
             case '2':
-                mostrarEstadisticasUniversitarias(facultades, programas, cursos, estudiantes, profesores);
+                if (facultades.empty() && programas.empty() && cursos.empty() && estudiantes.empty() && profesores.empty()) {
+                    mensajeAlerta("No hay datos disponibles. Primero genere o cargue la universidad.");
+                } else {
+                    mostrarEstadisticasUniversitarias(facultades, programas, cursos, estudiantes, profesores);
+                }
                 pausar();
                 break;
             case '3':
-                calcularNominaMasiva(profesores);
+                if (profesores.empty()) {
+                    mensajeAlerta("No hay datos disponibles. Primero genere o cargue la universidad.");
+                } else {
+                    calcularNominaMasiva(profesores);
+                }
                 pausar();
                 break;
             case '4':
-                menuGeneracionHorarios(cursos, RUTA_CURSOS);
+                if (cursos.empty()) {
+                    mensajeAlerta("No hay datos disponibles. Primero genere o cargue la universidad.");
+                } else {
+                    menuGeneracionHorarios(cursos, RUTA_CURSOS);
+                }
                 pausar();
                 break;
             case '5':
-                evaluarErraMasivo(estudiantes);
+                if (estudiantes.empty()) {
+                    mensajeAlerta("No hay datos disponibles. Primero genere o cargue la universidad.");
+                } else {
+                    evaluarErraMasivo(estudiantes);
+                }
                 pausar();
                 break;
             case '6':

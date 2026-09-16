@@ -377,29 +377,35 @@ def mostrar_estadisticas_universitarias(fac, prog, cur, est, prof):
 
 def consultar_estudiante_ficha(estudiantes):
     if not estudiantes:
-        mensaje_alerta("No hay estudiantes cargados en el sistema.")
+        mensaje_alerta("No hay datos disponibles. Primero genere o cargue la universidad.")
         pausar()
         return
+    id_sugerido = estudiantes[0].identificacion
     opcion = None
     while opcion != 0 and opcion != 5:
         limpiar_pantalla()
         titulo_seccion("CONSULTA DE FICHA DE ESTUDIANTE")
+        print("Sugerencia para probar:")
+        print(f"- ID de estudiante disponible: {id_sugerido}")
+        separador()
         print("1. Buscar por identificacion")
-        print("2. Mostrar estudiante aleatorio")
-        print("3. Mostrar estudiante en riesgo ERRA")
-        print("4. Mostrar estudiante sin riesgo ERRA")
+        print("2. Usar estudiante de ejemplo")
+        print("3. Usar estudiante en riesgo")
+        print("4. Usar estudiante sin riesgo")
         print("5. Volver (o presione ENTER)")
         separador()
         opcion = leer_opcion_inmediata("Opcion: ")
 
         if opcion == 1:
-            identificacion = leer_palabra("Ingrese identificacion del estudiante (o 'cancelar' para volver): ")
+            print("\nIngrese la identificacion del estudiante.")
+            print(f"Sugerencia: pruebe con {id_sugerido}.")
+            identificacion = leer_palabra("Identificacion (o 'cancelar' para volver): ")
             if not es_cancelar(identificacion) and identificacion:
                 consultar_estudiante(estudiantes, identificacion)
             pausar()
         elif opcion == 2:
             est = random.choice(estudiantes)
-            mensaje_info(f"Mostrando ficha del estudiante aleatorio (ID: {est.identificacion}):")
+            mensaje_info(f"Mostrando ficha del estudiante de ejemplo (ID: {est.identificacion}):")
             consultar_estudiante(estudiantes, est.identificacion)
             pausar()
         elif opcion == 3:
@@ -469,23 +475,29 @@ def listar_cursos_muestra(cursos, max_count=10):
 
 def consultar_curso_ficha(cursos):
     if not cursos:
-        mensaje_alerta("No hay cursos registrados en el sistema.")
+        mensaje_alerta("No hay datos disponibles. Primero genere o cargue la universidad.")
         pausar()
         return
+    cod_sugerido = cursos[0].codigo
     opcion = None
     while opcion != 0 and opcion != 5:
         limpiar_pantalla()
         titulo_seccion("CONSULTA DE CURSO / HORARIOS")
+        print("Sugerencia para probar:")
+        print(f"- Codigo de curso disponible: {cod_sugerido}")
+        separador()
         print("1. Buscar por codigo")
-        print("2. Mostrar curso aleatorio")
-        print("3. Mostrar curso con horario")
+        print("2. Usar curso de ejemplo")
+        print("3. Usar curso con horario")
         print("4. Listar cursos de ejemplo")
         print("5. Volver (o presione ENTER)")
         separador()
         opcion = leer_opcion_inmediata("Opcion: ")
 
         if opcion == 1:
-            codigo = leer_palabra("Ingrese codigo del curso (o 'cancelar' para volver): ")
+            print("\nIngrese el codigo del curso.")
+            print(f"Sugerencia: pruebe con {cod_sugerido}.")
+            codigo = leer_palabra("Codigo (o 'cancelar' para volver): ")
             if not es_cancelar(codigo) and codigo:
                 encontrado = None
                 for c in cursos:
@@ -499,7 +511,7 @@ def consultar_curso_ficha(cursos):
             pausar()
         elif opcion == 2:
             c = random.choice(cursos)
-            mensaje_info(f"Mostrando ficha de curso aleatorio (Codigo: {c.codigo}):")
+            mensaje_info(f"Mostrando ficha de curso de ejemplo (Codigo: {c.codigo}):")
             mostrar_ficha_curso_detallada(c)
             pausar()
         elif opcion == 3:
@@ -524,33 +536,41 @@ def consultar_curso_ficha(cursos):
             pausar()
 
 
-import random
-
-
 def consultar_profesor_ficha(profesores):
     if not profesores:
-        mensaje_alerta("No hay profesores cargados en el sistema.")
+        mensaje_alerta("No hay datos disponibles. Primero genere o cargue la universidad.")
         pausar()
         return
+    id_sugerido = profesores[0].identificacion
     opcion = None
     while opcion != 0 and opcion != 6:
         limpiar_pantalla()
         titulo_seccion("CONSULTA DE FICHA Y LIQUIDACION DE PROFESOR")
+        print("Sugerencia para probar:")
+        print(f"- ID de profesor disponible: {id_sugerido}")
+        separador()
         print("1. Buscar por identificacion")
-        print("2. Mostrar profesor de planta")
-        print("3. Mostrar profesor ocasional")
-        print("4. Mostrar profesor catedratico")
-        print("5. Mostrar profesor aleatorio")
+        print("2. Usar profesor de ejemplo")
+        print("3. Usar profesor de planta")
+        print("4. Usar profesor ocasional")
+        print("5. Usar profesor catedratico")
         print("6. Volver (o presione ENTER)")
         separador()
         opcion = leer_opcion_inmediata("Opcion: ")
 
         if opcion == 1:
-            identificacion = leer_palabra("Ingrese identificacion del profesor (o 'cancelar' para volver): ")
+            print("\nIngrese la identificacion del profesor.")
+            print(f"Sugerencia: pruebe con {id_sugerido}.")
+            identificacion = leer_palabra("Identificacion (o 'cancelar' para volver): ")
             if not es_cancelar(identificacion) and identificacion:
                 consultar_profesor(profesores, identificacion)
             pausar()
         elif opcion == 2:
+            prof = random.choice(profesores)
+            mensaje_info(f"Mostrando ficha de profesor de ejemplo (ID: {prof.identificacion}):")
+            consultar_profesor(profesores, prof.identificacion)
+            pausar()
+        elif opcion == 3:
             id_ejemplo = None
             for prof in profesores:
                 if getattr(prof, "activo", True) and prof.tipo_vinculacion == "Planta":
@@ -562,7 +582,7 @@ def consultar_profesor_ficha(profesores):
             else:
                 mensaje_alerta("No se encontro ningun profesor de Planta en memoria.")
             pausar()
-        elif opcion == 3:
+        elif opcion == 4:
             id_ejemplo = None
             for prof in profesores:
                 if getattr(prof, "activo", True) and prof.tipo_vinculacion == "Ocasional":
@@ -574,7 +594,7 @@ def consultar_profesor_ficha(profesores):
             else:
                 mensaje_alerta("No se encontro ningun profesor Ocasional en memoria.")
             pausar()
-        elif opcion == 4:
+        elif opcion == 5:
             id_ejemplo = None
             for prof in profesores:
                 if getattr(prof, "activo", True) and prof.tipo_vinculacion == "Catedratico":
@@ -585,11 +605,6 @@ def consultar_profesor_ficha(profesores):
                 consultar_profesor(profesores, id_ejemplo)
             else:
                 mensaje_alerta("No se encontro ningun profesor Catedratico en memoria.")
-            pausar()
-        elif opcion == 5:
-            prof = random.choice(profesores)
-            mensaje_info(f"Mostrando ficha de profesor aleatorio (ID: {prof.identificacion}):")
-            consultar_profesor(profesores, prof.identificacion)
             pausar()
         elif opcion == 6 or opcion == 0:
             break
@@ -718,16 +733,28 @@ def main():
             )
             pausar()
         elif opcion == "2":
-            mostrar_estadisticas_universitarias(facultades, programas, cursos, estudiantes, profesores)
+            if not facultades and not programas and not cursos and not estudiantes and not profesores:
+                mensaje_alerta("No hay datos disponibles. Primero genere o cargue la universidad.")
+            else:
+                mostrar_estadisticas_universitarias(facultades, programas, cursos, estudiantes, profesores)
             pausar()
         elif opcion == "3":
-            calcular_nomina_masiva(profesores)
+            if not profesores:
+                mensaje_alerta("No hay datos disponibles. Primero genere o cargue la universidad.")
+            else:
+                calcular_nomina_masiva(profesores)
             pausar()
         elif opcion == "4":
-            menu_generacion_horarios(cursos, RUTA_CURSOS)
+            if not cursos:
+                mensaje_alerta("No hay datos disponibles. Primero genere o cargue la universidad.")
+            else:
+                menu_generacion_horarios(cursos, RUTA_CURSOS)
             pausar()
         elif opcion == "5":
-            evaluar_erra_masivo(estudiantes)
+            if not estudiantes:
+                mensaje_alerta("No hay datos disponibles. Primero genere o cargue la universidad.")
+            else:
+                evaluar_erra_masivo(estudiantes)
             pausar()
         elif opcion == "6":
             consultar_estudiante_ficha(estudiantes)
